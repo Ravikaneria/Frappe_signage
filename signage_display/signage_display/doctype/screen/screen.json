@@ -1,0 +1,140 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-06-16 00:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "screen_id",
+  "screen_name",
+  "col_break_1",
+  "is_active",
+  "is_live",
+  "last_seen",
+  "sec_url",
+  "display_url",
+  "sec_signage",
+  "show_all_signages",
+  "signages",
+  "sec_notes",
+  "location_notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "screen_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Screen ID",
+   "read_only": 1,
+   "unique": 1,
+   "bold": 1,
+   "description": "Auto-generated on save. Used in the display URL."
+  },
+  {
+   "fieldname": "screen_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Screen Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "col_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Active"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_live",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Live Now",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_seen",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Last Seen",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_url",
+   "fieldtype": "Section Break",
+   "label": "Display URL"
+  },
+  {
+   "fieldname": "display_url",
+   "fieldtype": "Data",
+   "label": "Display URL",
+   "read_only": 1,
+   "description": "Open this URL on the TV or display screen."
+  },
+  {
+   "fieldname": "sec_signage",
+   "fieldtype": "Section Break",
+   "label": "Signage Assignment"
+  },
+  {
+   "default": "1",
+   "fieldname": "show_all_signages",
+   "fieldtype": "Check",
+   "label": "Show All Published Signages",
+   "description": "If checked, this screen shows all published signages. Uncheck to assign specific signages below."
+  },
+  {
+   "fieldname": "signages",
+   "fieldtype": "Table",
+   "label": "Assigned Signages",
+   "options": "Screen Signage Item",
+   "depends_on": "eval:!doc.show_all_signages",
+   "description": "Add signages in the order you want them displayed on this screen."
+  },
+  {
+   "fieldname": "sec_notes",
+   "fieldtype": "Section Break",
+   "label": "Location / Notes"
+  },
+  {
+   "fieldname": "location_notes",
+   "fieldtype": "Small Text",
+   "label": "Location / Notes"
+  }
+ ],
+ "icon": "fa fa-tv",
+ "in_create": 0,
+ "links": [],
+ "modified": "2026-06-16 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Signage Display",
+ "name": "Screen",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "migration_hash": null,
+ "naming_series": "SCR-.#####"
+}

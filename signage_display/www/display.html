@@ -1,0 +1,87 @@
+{% extends "templates/web.html" %}
+
+{% block title %}{{ context.title or signage_settings.display_name or "Signage Display" }}{% endblock %}
+
+{% block head_include %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+<link rel="stylesheet" href="/assets/signage_display/css/display.css" />
+{% endblock %}
+
+{% block header %}{% endblock %}
+{% block navbar %}{% endblock %}
+
+{% block page_content %}
+
+{% if context.error_message %}
+<div class="sd-error"><p>{{ context.error_message }}</p></div>
+{% else %}
+
+<div class="sd-wrapper">
+  <div class="swiper sd-swiper">
+    <div class="swiper-wrapper" style="height: {{ signage_height }}vh;">
+
+      {% for signage in signages %}
+      <div class="swiper-slide"
+           data-swiper-autoplay="{{ (signage.display_duration * 1000) if signage.display_duration else signage_settings.display_duration }}"
+           data-content-type="{{ signage.content_type or 'Image' }}">
+        <div class="card sd-card" style="height: {{ signage_height - 4 }}vh;">
+
+          {% if signage.content_type == "Image" or not signage.content_type %}
+            {% if signage.display_image %}
+            <img src="{{ signage.display_image }}" class="card-img sd-img" alt="{{ signage.title }}" />
+            <div class="card-img-overlay p-5">
+            {% else %}
+            <div class="card-body p-5">
+            {% endif %}
+              {% if signage.show_title %}<h1 class="card-title">{{ signage.title }}</h1>{% endif %}
+              {% if signage.description %}<p class="card-text">{{ signage.description }}</p>{% endif %}
+            </div>
+
+          {% elif signage.content_type == "Video" %}
+            <video class="sd-video" src="{{ signage.video_file }}" autoplay muted playsinline data-slide-video="1"></video>
+            {% if signage.show_title or signage.description %}
+            <div class="card-img-overlay p-5">
+              {% if signage.show_title %}<h1 class="card-title">{{ signage.title }}</h1>{% endif %}
+              {% if signage.description %}<p class="card-text">{{ signage.description }}</p>{% endif %}
+            </div>
+            {% endif %}
+
+          {% elif signage.content_type == "YouTube" %}
+            <iframe class="sd-youtube"
+              src="{{ signage.youtube_embed_url }}"
+              allow="autoplay; encrypted-media; fullscreen"
+              allowfullscreen frameborder="0"></iframe>
+
+          {% elif signage.content_type == "Text Only" %}
+            <div class="card-body p-5 sd-text-only">
+              {% if signage.show_title %}<h1 class="card-title">{{ signage.title }}</h1>{% endif %}
+              {% if signage.description %}<div class="card-text">{{ signage.description }}</div>{% endif %}
+            </div>
+          {% endif %}
+
+        </div>
+      </div>
+      {% endfor %}
+
+    </div>
+    <div class="swiper-pagination"></div>
+  </div>
+</div>
+
+{% endif %}
+
+<script>
+  window._sd = {
+    csrfToken:       "{{ csrf_token }}",
+    displayDuration: {{ signage_settings.display_duration or 20000 }},
+    rowCount:        {{ signage_settings.row_count or 1 }},
+    columnCount:     {{ signage_settings.column_count or 1 }},
+    signageHeight:   {{ signage_height }},
+    screenId:        "{{ context.screen_id or '' }}"
+  };
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+<script src="/assets/signage_display/js/display.js"></script>
+
+{% endblock %}

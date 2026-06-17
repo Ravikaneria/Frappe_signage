@@ -1,0 +1,18 @@
+[project]
+name = "signage_display"
+authors = [
+    {name = "Highflyer Global Innovations", email = "hello@hfgi.co.uk"}
+]
+description = "A Frappe app for creating digital signage display boards"
+requires-python = ">=3.10"
+readme = "README.md"
+license = {text = "MIT"}
+dynamic = ["version"]
+dependencies = []
+
+[tool.flit.module]
+name = "signage_display"
+
+[build-system]
+requires = ["flit_core >=3.4,<4"]
+build-backend = "flit_core.buildapi"
