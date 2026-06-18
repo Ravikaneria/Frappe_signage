@@ -75,10 +75,13 @@ main,
     inset: 0;
     width: 100%;
     height: 100%;
-    border-radius: 0;           /* no rounded corners in fullscreen */
+    border-radius: 0;
     box-shadow: none;
     overflow: hidden;
     background: #000;
+    /* Make sd-card a flex container so Text Only child fills it */
+    display: flex;
+    flex-direction: column;
 }
 
 /* ── Image ── */
@@ -160,8 +163,8 @@ main,
 
 /* ── Text Only ── */
 .sd-text-only {
-    position: absolute;
-    inset: 0;
+    flex: 1;                    /* fill the entire sd-card height */
+    width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -170,6 +173,7 @@ main,
     background: #1a1a2e;
     color: #fff;
     padding: 4rem;
+    box-sizing: border-box;
 }
 
 .sd-text-only .card-title {
