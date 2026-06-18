@@ -81,7 +81,7 @@ function handleActiveSlide() {
     if (playPromise !== undefined) {
         playPromise.catch(() => {
             // Browser blocked autoplay with audio — play muted as fallback
-            video.muted = true;
+            video.muted = false;
             video.play().catch(() => {});
         });
     }
