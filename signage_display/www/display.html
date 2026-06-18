@@ -66,8 +66,8 @@
           {# ── TEXT ONLY ── #}
           {% elif signage.content_type == "Text Only" %}
             <div class="sd-text-only">
-              {% if signage.show_title %}<h1 class="card-title">{{ signage.title }}</h1>{% endif %}
-              {% if signage.description %}<div class="card-text">{{ signage.description }}</div>{% endif %}
+              {% if signage.title %}<h1 class="card-title">{{ signage.title }}</h1>{% endif %}
+              {% if signage.description %}<div class="card-text">{{ signage.description | safe }}</div>{% endif %}
             </div>
           {% endif %}
 
