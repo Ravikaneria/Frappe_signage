@@ -21,9 +21,11 @@
     <div class="swiper-wrapper">
 
       {% for signage in signages %}
+      {% set dur_ms = (signage.display_duration * 1000) if signage.display_duration else signage_settings.display_duration %}
       <div class="swiper-slide"
-           data-swiper-autoplay="{{ (signage.display_duration * 1000) if signage.display_duration else signage_settings.display_duration }}"
-           data-content-type="{{ signage.content_type or 'Image' }}">
+           data-swiper-autoplay="{{ dur_ms }}"
+           data-content-type="{{ signage.content_type or 'Image' }}"
+           {% if signage.content_type == "YouTube" %}data-yt-duration="{{ dur_ms }}"{% endif %}>
         <div class="card sd-card">
 
           {# ── IMAGE ── #}
@@ -48,12 +50,18 @@
             </div>
             {% endif %}
 
-          {# ── YOUTUBE ── #}
+          {# ── YOUTUBE — with progress bar + countdown ── #}
           {% elif signage.content_type == "YouTube" %}
             <iframe class="sd-youtube"
               src="{{ signage.youtube_embed_url }}"
               allow="autoplay; encrypted-media; fullscreen"
               allowfullscreen frameborder="0"></iframe>
+            <div class="sd-yt-bar-wrapper">
+              <div class="sd-yt-bar-track">
+                <div class="sd-yt-progress-bar"></div>
+              </div>
+              <span class="sd-yt-countdown"></span>
+            </div>
 
           {# ── TEXT ONLY ── #}
           {% elif signage.content_type == "Text Only" %}
