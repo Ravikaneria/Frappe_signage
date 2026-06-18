@@ -1,6 +1,6 @@
 {% extends "templates/web.html" %}
 
-{% block title %}{{ context.title or signage_settings.display_name or "Signage Display" }}{% endblock %}
+{% block title %}{{ screen_title or "Signage Display" }}{% endblock %}
 
 {% block head_include %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
@@ -12,8 +12,8 @@
 
 {% block page_content %}
 
-{% if context.error_message %}
-<div class="sd-error"><p>{{ context.error_message }}</p></div>
+{% if error_message %}
+<div class="sd-error"><p>{{ error_message }}</p></div>
 {% else %}
 
 <div class="sd-wrapper">
@@ -77,7 +77,7 @@
     rowCount:        {{ signage_settings.row_count or 1 }},
     columnCount:     {{ signage_settings.column_count or 1 }},
     signageHeight:   {{ signage_height }},
-    screenId:        "{{ context.screen_id or '' }}"
+    screenId:        "{{ screen_id or '' }}"
   };
 </script>
 
