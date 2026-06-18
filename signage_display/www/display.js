@@ -291,10 +291,10 @@ function buildSlide(s) {
             </div>`;
 
     } else {
-        inner = `<div class="sd-text-only">
-                   ${titleHtml}
-                   <div class="card-text">${s.description || ""}</div>
-                 </div>`;
+        // Text Only — always show title, description is raw HTML from Text Editor
+        const txtTitle = s.title ? `<h1 class="card-title">${esc(s.title)}</h1>` : "";
+        const txtDesc  = s.description ? `<div class="card-text">${s.description}</div>` : "";
+        inner = `<div class="sd-text-only">${txtTitle}${txtDesc}</div>`;
     }
 
     // Store ytDuration on the slide element so handleActiveSlide can read it
