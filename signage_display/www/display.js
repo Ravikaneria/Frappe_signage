@@ -115,6 +115,23 @@ function handleActiveSlide() {
         // Show and animate the progress bar
         startProgressBar(slide, durationMs);
 
+        // Try to unmute immediately (works if user has already interacted)
+        const ytIframe = slide.querySelector("iframe.sd-youtube");
+        if (ytIframe) {
+            setTimeout(() => {
+                try {
+                    ytIframe.contentWindow.postMessage(
+                        JSON.stringify({ event: "command", func: "unMute", args: [] }),
+                        "*"
+                    );
+                    ytIframe.contentWindow.postMessage(
+                        JSON.stringify({ event: "command", func: "setVolume", args: [100] }),
+                        "*"
+                    );
+                } catch(e) {}
+            }, 1500); // wait 1.5s for iframe to fully load
+        }
+
         // Advance after the duration
         _ytTimer = setTimeout(() => {
             clearYouTubeTimer();
@@ -171,6 +188,37 @@ function formatTime(totalSeconds) {
     const s = totalSeconds % 60;
     return `${m}:${s.toString().padStart(2, "0")}`;
 }
+
+// ── YouTube audio: unmute all iframes via postMessage ────────────────────────
+// Browsers block autoplay-with-audio until first user gesture.
+// We send unMute + playVideo commands to every YouTube iframe on first click.
+let _userInteracted = false;
+
+function unmuteAllYouTubeIframes() {
+    if (_userInteracted) return;
+    _userInteracted = true;
+
+    // Hide the "tap for audio" hint
+    const hint = document.getElementById("sd-audio-hint");
+    if (hint) { hint.classList.add("hide"); setTimeout(() => hint.remove(), 700); }
+    document.querySelectorAll("iframe.sd-youtube").forEach(iframe => {
+        try {
+            iframe.contentWindow.postMessage(
+                JSON.stringify({ event: "command", func: "unMute", args: [] }),
+                "*"
+            );
+            iframe.contentWindow.postMessage(
+                JSON.stringify({ event: "command", func: "setVolume", args: [100] }),
+                "*"
+            );
+        } catch(e) {}
+    });
+}
+
+// Listen for any user interaction to unmute
+["click", "touchstart", "keydown"].forEach(evt => {
+    document.addEventListener(evt, unmuteAllYouTubeIframes, { once: false, passive: true });
+});
 
 function goNext() {
     if (!swiper) return;
