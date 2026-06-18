@@ -30,7 +30,7 @@ class Signage(Document):
             )
         self.youtube_embed_url = (
             f"https://www.youtube.com/embed/{vid_id}"
-            f"?autoplay=1&mute=1&loop=1&playlist={vid_id}"
+            f"?autoplay=1&mute=0&loop=1&playlist={vid_id}"
             f"&controls=0&modestbranding=1&rel=0&enablejsapi=1"
         )
 
