@@ -79,16 +79,19 @@ class Signage(Document):
 #  SHARED HELPER
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _format_signage(row, site_url, duration_override_ms=None):
-    """Convert a Signage db row into the dict the player expects."""
+def _format_signage(row, site_url, duration_override_sec=None):
+    """
+    Convert a Signage db row into the dict the player expects.
+    display_duration is returned in SECONDS. display.js multiplies by 1000 → ms.
+    """
     item = dict(row)
 
-    # Use per-screen duration override if provided, else the signage's own value,
-    # else the player will fall back to the global Signage Settings value (duration=0)
-    if duration_override_ms is not None:
-        item["display_duration"] = duration_override_ms
+    # Use per-screen duration override if provided (also in seconds),
+    # else keep the signage's own value in seconds (0 = use global setting in JS).
+    if duration_override_sec is not None:
+        item["display_duration"] = duration_override_sec
     else:
-        item["display_duration"] = (item.get("display_duration") or 0) * 1000
+        item["display_duration"] = item.get("display_duration") or 0
 
     if item.get("display_image"):
         item["display_image"] = site_url + item["display_image"]
@@ -178,8 +181,9 @@ def get_signages_for_screen(screen_id):
             continue  # signage not published or deleted — skip
 
         # Per-row duration override (convert seconds → ms; 0 means use signage default)
-        override_ms = (item.duration_override * 1000) if item.duration_override else None
-        result.append(_format_signage(row, site_url, override_ms))
+        # Pass raw seconds — _format_signage stores as seconds, JS converts to ms
+        override_sec = item.duration_override if item.duration_override else None
+        result.append(_format_signage(row, site_url, override_sec))
 
     return result
 
