@@ -21,7 +21,7 @@ frappe.ui.form.on("Signage", {
             const id = m[1];
             const embed =
                 `https://www.youtube.com/embed/${id}` +
-                `?autoplay=1&mute=1&loop=1&playlist=${id}` +
+                `?autoplay=1&mute=0&loop=1&playlist=${id}` +
                 `&controls=0&modestbranding=1&rel=0&enablejsapi=1`;
             frm.set_value("youtube_embed_url", embed);
             frappe.show_alert({ message: `YouTube ID detected: ${id}`, indicator: "green" });
