@@ -1,10 +1,14 @@
 /**
  * display.js — Signage Display Player
- * Fixes in this version:
- *  1. Video plays WITH audio (muted removed)
- *  2. Video slides wait for the 'ended' event — never cut short
- *  3. Safety timeout for video set to 3 hours (won't fire for normal videos)
- *  4. Fullscreen layout (CSS handles sizing)
+ *
+ * YouTube fixes:
+ *  - Swiper autoplay stopped for YouTube slides (same as video)
+ *  - YouTube advances after its display_duration (not global 20s)
+ *  - Countdown progress bar shown for YouTube slides
+ *
+ * Video fixes (kept from before):
+ *  - Audio plays, advances on 'ended' event
+ *  - Safety timeout = 3 hours
  */
 "use strict";
 
@@ -17,8 +21,10 @@ const API_ALL    = "/api/method/signage_display.signage_display.doctype.signage.
 const API_SCREEN = "/api/method/signage_display.signage_display.doctype.signage.signage.get_signages_for_screen";
 const API_HB     = "/api/method/signage_display.signage_display.doctype.signage.signage.screen_heartbeat";
 
-let swiper     = null;
-let _lastJson  = null;
+let swiper          = null;
+let _lastJson       = null;
+let _ytTimer        = null;   // setTimeout handle for YouTube advancement
+let _ytBarInterval  = null;   // setInterval handle for progress bar animation
 
 document.addEventListener("DOMContentLoaded", () => {
     initSwiper();
@@ -42,11 +48,13 @@ function initSwiper() {
         loop: false,
     });
 
+    // When autoplay fires, check — if current slide is video or YouTube, suppress it
     swiper.on("autoplayStop", () => {
-        // Only restart if the current slide is NOT a video
-        // (videos manage their own advancement via 'ended' event)
         const slide = swiper.slides[swiper.activeIndex];
-        if (slide && !slide.querySelector("video.sd-video")) {
+        if (!slide) return;
+        const isVideo   = !!slide.querySelector("video.sd-video");
+        const isYouTube = slide.dataset.contentType === "YouTube";
+        if (!isVideo && !isYouTube) {
             swiper.autoplay.start();
         }
     });
@@ -54,11 +62,14 @@ function initSwiper() {
     swiper.on("slideChangeTransitionEnd", handleActiveSlide);
 }
 
-// ── Video slide handler ───────────────────────────────────────────────────────
+// ── Active slide handler ──────────────────────────────────────────────────────
 function handleActiveSlide() {
     if (!swiper) return;
 
-    // Pause all videos that are not the current slide
+    // Clear any running YouTube timer + progress bar
+    clearYouTubeTimer();
+
+    // Pause all videos
     document.querySelectorAll(".sd-video").forEach(v => {
         v.pause();
         v.currentTime = 0;
@@ -68,38 +79,97 @@ function handleActiveSlide() {
     const slide = swiper.slides[swiper.activeIndex];
     if (!slide) return;
 
-    const video = slide.querySelector("video.sd-video");
-    if (!video) return;
+    const contentType = slide.dataset.contentType || "Image";
 
-    // Stop Swiper autoplay — video controls when to advance
-    swiper.autoplay.stop();
-    video.currentTime = 0;
+    // ── VIDEO ─────────────────────────────────────────────────────────────────
+    if (contentType === "Video") {
+        const video = slide.querySelector("video.sd-video");
+        if (!video) return;
 
-    // Play with audio — browser may block if no user interaction yet
-    // We try with audio first, fallback to muted if blocked
-    const playPromise = video.play();
-    if (playPromise !== undefined) {
-        playPromise.catch(() => {
-            // Browser blocked autoplay with audio — play muted as fallback
-            video.muted = false;
-            video.play().catch(() => {});
-        });
+        swiper.autoplay.stop();
+        video.currentTime = 0;
+
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(() => {
+                video.muted = true;
+                video.play().catch(() => {});
+            });
+        }
+
+        video.onended = () => { video.onended = null; goNext(); };
+
+        // Safety — 3 hours, won't fire for normal videos
+        setTimeout(() => {
+            if (video.onended) { video.onended = null; goNext(); }
+        }, 3 * 60 * 60 * 1000);
     }
 
-    // Advance to next slide when video naturally ends
-    video.onended = () => {
-        video.onended = null;
-        goNext();
-    };
+    // ── YOUTUBE ───────────────────────────────────────────────────────────────
+    else if (contentType === "YouTube") {
+        swiper.autoplay.stop();
 
-    // Safety timeout — 3 hours — only fires if video somehow never ends
-    // This will NOT interrupt a 3-minute video
-    setTimeout(() => {
-        if (video.onended) {
-            video.onended = null;
+        // Read duration from the slide's data attribute (set during buildSlide)
+        const durationMs = parseInt(slide.dataset.ytDuration) || (SD.displayDuration || 60000);
+
+        // Show and animate the progress bar
+        startProgressBar(slide, durationMs);
+
+        // Advance after the duration
+        _ytTimer = setTimeout(() => {
+            clearYouTubeTimer();
             goNext();
+        }, durationMs);
+    }
+}
+
+function clearYouTubeTimer() {
+    if (_ytTimer)       { clearTimeout(_ytTimer);   _ytTimer = null; }
+    if (_ytBarInterval) { clearInterval(_ytBarInterval); _ytBarInterval = null; }
+    // Reset all progress bars
+    document.querySelectorAll(".sd-yt-progress-bar").forEach(bar => {
+        bar.style.transition = "none";
+        bar.style.width = "0%";
+    });
+}
+
+// ── YouTube progress bar ──────────────────────────────────────────────────────
+function startProgressBar(slide, durationMs) {
+    const bar = slide.querySelector(".sd-yt-progress-bar");
+    if (!bar) return;
+
+    bar.style.transition = "none";
+    bar.style.width = "0%";
+
+    // Force reflow so transition starts from 0
+    void bar.offsetWidth;
+
+    bar.style.transition = `width ${durationMs}ms linear`;
+    bar.style.width = "100%";
+
+    // Update the countdown label every second
+    const label = slide.querySelector(".sd-yt-countdown");
+    if (!label) return;
+
+    let remaining = Math.round(durationMs / 1000);
+    label.textContent = formatTime(remaining);
+
+    _ytBarInterval = setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+            label.textContent = "0:00";
+            clearInterval(_ytBarInterval);
+            _ytBarInterval = null;
+        } else {
+            label.textContent = formatTime(remaining);
         }
-    }, 3 * 60 * 60 * 1000);
+    }, 1000);
+}
+
+function formatTime(totalSeconds) {
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 function goNext() {
@@ -116,10 +186,7 @@ async function fetchSignages() {
             ? `${API_SCREEN}?screen_id=${encodeURIComponent(SCREEN_ID)}`
             : API_ALL;
         const res = await fetch(url, {
-            headers: {
-                "X-Frappe-CSRF-Token": SD.csrfToken || "Guest",
-                Accept: "application/json",
-            },
+            headers: { "X-Frappe-CSRF-Token": SD.csrfToken || "Guest", Accept: "application/json" },
         });
         if (!res.ok) return null;
         const data = await res.json();
@@ -132,10 +199,7 @@ async function sendHeartbeat() {
     try {
         await fetch(`${API_HB}?screen_id=${encodeURIComponent(SCREEN_ID)}`, {
             method: "POST",
-            headers: {
-                "X-Frappe-CSRF-Token": SD.csrfToken || "Guest",
-                "Content-Type": "application/json",
-            },
+            headers: { "X-Frappe-CSRF-Token": SD.csrfToken || "Guest", "Content-Type": "application/json" },
             body: JSON.stringify({ screen_id: SCREEN_ID }),
         });
     } catch {}
@@ -143,15 +207,13 @@ async function sendHeartbeat() {
 
 // ── Slide builder ─────────────────────────────────────────────────────────────
 function buildSlide(s) {
-    const type     = (s.content_type || "Image");
-    const duration = s.display_duration
+    const type       = (s.content_type || "Image");
+    const durationMs = s.display_duration
         ? s.display_duration * 1000
         : (SD.displayDuration || 20000);
 
-    const titleHtml = s.show_title
-        ? `<h1 class="card-title">${esc(s.title)}</h1>` : "";
-    const descHtml  = s.description
-        ? `<p class="card-text">${s.description}</p>` : "";
+    const titleHtml = s.show_title ? `<h1 class="card-title">${esc(s.title)}</h1>` : "";
+    const descHtml  = s.description ? `<p class="card-text">${s.description}</p>` : "";
 
     let inner = "";
 
@@ -162,33 +224,41 @@ function buildSlide(s) {
             : `<div class="card-body">${titleHtml}${descHtml}</div>`;
 
     } else if (type === "Video") {
-        // NO muted attribute — audio plays normally
         inner = `<video class="sd-video" src="${esc(s.video_file)}" playsinline data-slide-video="1"></video>
-                 ${(titleHtml || descHtml)
-                    ? `<div class="card-img-overlay">${titleHtml}${descHtml}</div>`
-                    : ""}`;
+                 ${(titleHtml || descHtml) ? `<div class="card-img-overlay">${titleHtml}${descHtml}</div>` : ""}`;
 
     } else if (type === "YouTube") {
-        inner = `<iframe class="sd-youtube"
-                   src="${esc(s.youtube_embed_url)}"
-                   allow="autoplay; encrypted-media; fullscreen"
-                   allowfullscreen frameborder="0"></iframe>`;
+        // Progress bar + countdown label overlay at the bottom
+        const countdownSecs = Math.round(durationMs / 1000);
+        inner = `
+            <iframe class="sd-youtube"
+                src="${esc(s.youtube_embed_url)}"
+                allow="autoplay; encrypted-media; fullscreen"
+                allowfullscreen frameborder="0"></iframe>
+            <div class="sd-yt-bar-wrapper">
+                <div class="sd-yt-bar-track">
+                    <div class="sd-yt-progress-bar"></div>
+                </div>
+                <span class="sd-yt-countdown">${formatTime(countdownSecs)}</span>
+            </div>`;
 
     } else {
-        // Text Only
         inner = `<div class="sd-text-only">
                    ${titleHtml}
                    <div class="card-text">${s.description || ""}</div>
                  </div>`;
     }
 
-    return `<div class="swiper-slide" data-swiper-autoplay="${duration}">
+    // Store ytDuration on the slide element so handleActiveSlide can read it
+    const ytAttr = type === "YouTube" ? `data-yt-duration="${durationMs}"` : "";
+
+    return `<div class="swiper-slide" data-swiper-autoplay="${durationMs}" data-content-type="${esc(type)}" ${ytAttr}>
               <div class="card sd-card">${inner}</div>
             </div>`;
 }
 
 function buildEmptySlide() {
-    return `<div class="swiper-slide">
+    return `<div class="swiper-slide" data-content-type="Image">
               <div class="card sd-card">
                 <div class="card-body" style="color:#888;font-size:1.5rem;">
                   No published signages yet.
@@ -207,6 +277,7 @@ async function refreshSignages() {
     _lastJson = json;
 
     const prev = swiper ? swiper.activeIndex : 0;
+    clearYouTubeTimer();
     swiper.autoplay.stop();
     swiper.removeAllSlides();
 
@@ -221,13 +292,9 @@ async function refreshSignages() {
 }
 
 function startPolling()   { refreshSignages(); setInterval(refreshSignages, POLL_INTERVAL_MS); }
-function startHeartbeat() { sendHeartbeat();   setInterval(sendHeartbeat,   HEARTBEAT_MS); }
+function startHeartbeat() { sendHeartbeat();   setInterval(sendHeartbeat, HEARTBEAT_MS); }
 
 function esc(str) {
     if (!str) return "";
-    return str
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
+    return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
