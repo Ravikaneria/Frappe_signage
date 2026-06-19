@@ -17,6 +17,17 @@ class Signage(Document):
     def validate(self):
         self._handle_youtube()
         self._auto_resize_image()
+        self._handle_webpage()
+
+    def _handle_webpage(self):
+        if self.content_type != "Webpage":
+            return
+        url = (self.webpage_url or "").strip()
+        if not url:
+            frappe.throw("Webpage URL is required for content type 'Webpage'.")
+        if not (url.startswith("http://") or url.startswith("https://")):
+            frappe.throw("Webpage URL must start with http:// or https://")
+        self.webpage_url = url
 
     def _handle_youtube(self):
         if self.content_type != "YouTube":
@@ -114,7 +125,7 @@ def get_all_signages():
         fields=[
             "title", "description", "show_title",
             "content_type", "display_duration",
-            "display_image", "video_file", "youtube_embed_url",
+            "display_image", "video_file", "youtube_embed_url", "webpage_url",
         ],
     )
     return [_format_signage(r, site_url) for r in rows]
@@ -173,7 +184,7 @@ def get_signages_for_screen(screen_id):
             [
                 "title", "description", "show_title",
                 "content_type", "display_duration",
-                "display_image", "video_file", "youtube_embed_url",
+                "display_image", "video_file", "youtube_embed_url", "webpage_url",
             ],
             as_dict=True,
         )
