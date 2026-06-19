@@ -9,6 +9,7 @@ frappe.ui.form.on("Signage", {
         frm.toggle_display("video_file",        t === "Video");
         frm.toggle_display("youtube_url",       t === "YouTube");
         frm.toggle_display("youtube_embed_url", t === "YouTube");
+        frm.toggle_display("webpage_url",       t === "Webpage");
         frm.toggle_display("display_duration",  t !== "Video");
     },
     youtube_url: function(frm) {
@@ -28,6 +29,18 @@ frappe.ui.form.on("Signage", {
         } else {
             frappe.show_alert({ message: "Could not detect YouTube video ID — check the URL", indicator: "orange" });
         }
+    },
+    webpage_url: function(frm) {
+        const url = frm.doc.webpage_url || "";
+        if (!url) return;
+        if (!/^https?:\/\//i.test(url)) {
+            frappe.show_alert({ message: "URL must start with http:// or https://", indicator: "orange" });
+            return;
+        }
+        frappe.show_alert({
+            message: "Note: the target site must allow embedding (no X-Frame-Options: DENY / SAMEORIGIN).",
+            indicator: "blue",
+        });
     },
     display_image: function(frm) {
         if (frm.doc.display_image) {
