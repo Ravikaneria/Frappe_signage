@@ -249,9 +249,9 @@ async function fetchSignages() {
         const url = SCREEN_ID
             ? `${API_SCREEN}?screen_id=${encodeURIComponent(SCREEN_ID)}`
             : API_ALL;
-        const res = await fetch(url, {
-            headers: { "X-Frappe-CSRF-Token": SD.csrfToken || "Guest", Accept: "application/json" },
-        });
+        const headers = { Accept: "application/json" };
+        if (SD.csrfToken) headers["X-Frappe-CSRF-Token"] = SD.csrfToken;
+        const res = await fetch(url, { headers });
         if (!res.ok) return null;
         const data = await res.json();
         return data.message || [];
@@ -261,10 +261,10 @@ async function fetchSignages() {
 async function sendHeartbeat() {
     if (!SCREEN_ID) return;
     try {
+        // Guest-allowed endpoint — GET with query param avoids CSRF entirely.
         await fetch(`${API_HB}?screen_id=${encodeURIComponent(SCREEN_ID)}`, {
-            method: "POST",
-            headers: { "X-Frappe-CSRF-Token": SD.csrfToken || "Guest", "Content-Type": "application/json" },
-            body: JSON.stringify({ screen_id: SCREEN_ID }),
+            method: "GET",
+            headers: { Accept: "application/json" },
         });
     } catch {}
 }
