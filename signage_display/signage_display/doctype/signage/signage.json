@@ -19,6 +19,7 @@
   "video_file",
   "youtube_url",
   "youtube_embed_url",
+  "webpage_url",
   "sec_text",
   "description"
  ],
@@ -66,7 +67,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Content Type",
-   "options": "Image\nVideo\nYouTube\nText Only",
+   "options": "Image\nVideo\nYouTube\nWebpage\nText Only",
    "bold": 0,
    "hidden": 0,
    "no_copy": 0,
@@ -130,6 +131,13 @@
    "hidden": 0,
    "no_copy": 0,
    "search_index": 0
+  },
+  {
+   "fieldname": "webpage_url",
+   "fieldtype": "Data",
+   "label": "Webpage URL",
+   "depends_on": "eval:doc.content_type=='Webpage'",
+   "description": "Full URL of the webpage to display fullscreen, e.g. https://teamup.com/xxxxx. The page must allow embedding (no X-Frame-Options: DENY)."
   },
   {
    "fieldname": "sec_text",
