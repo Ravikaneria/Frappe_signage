@@ -20,6 +20,12 @@
   "youtube_url",
   "youtube_embed_url",
   "webpage_url",
+  "pdf_file",
+  "pdf_page_duration",
+  "pdf_pages_json",
+  "clock_format",
+  "clock_show_date",
+  "clock_timezone_label",
   "sec_text",
   "description"
  ],
@@ -67,7 +73,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Content Type",
-   "options": "Image\nVideo\nYouTube\nWebpage\nText Only",
+   "options": "Image\nVideo\nYouTube\nWebpage\nPDF\nClock\nText Only",
    "bold": 0,
    "hidden": 0,
    "no_copy": 0,
@@ -138,6 +144,51 @@
    "label": "Webpage URL",
    "depends_on": "eval:doc.content_type=='Webpage'",
    "description": "Full URL of the webpage to display fullscreen, e.g. https://teamup.com/xxxxx. The page must allow embedding (no X-Frame-Options: DENY)."
+  },
+  {
+   "fieldname": "pdf_file",
+   "fieldtype": "Attach",
+   "label": "PDF File",
+   "depends_on": "eval:doc.content_type=='PDF'",
+   "description": "Upload a PDF. Each page is auto-converted into a slide and cycled through like a slideshow."
+  },
+  {
+   "fieldname": "pdf_page_duration",
+   "fieldtype": "Int",
+   "label": "Seconds per PDF Page",
+   "default": "8",
+   "depends_on": "eval:doc.content_type=='PDF'",
+   "description": "How long each page of the PDF is shown before moving to the next page."
+  },
+  {
+   "fieldname": "pdf_pages_json",
+   "fieldtype": "Long Text",
+   "label": "PDF Pages (internal)",
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "clock_format",
+   "fieldtype": "Select",
+   "label": "Clock Format",
+   "options": "24 Hour\n12 Hour (AM/PM)",
+   "default": "24 Hour",
+   "depends_on": "eval:doc.content_type=='Clock'"
+  },
+  {
+   "default": "1",
+   "fieldname": "clock_show_date",
+   "fieldtype": "Check",
+   "label": "Show Date",
+   "depends_on": "eval:doc.content_type=='Clock'"
+  },
+  {
+   "fieldname": "clock_timezone_label",
+   "fieldtype": "Data",
+   "label": "Timezone Label (optional)",
+   "depends_on": "eval:doc.content_type=='Clock'",
+   "description": "Optional label shown under the clock, e.g. 'IST' or 'Mumbai Office'. Time itself uses the viewer's browser timezone."
   },
   {
    "fieldname": "sec_text",

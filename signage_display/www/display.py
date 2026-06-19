@@ -39,13 +39,23 @@ def get_context(context):
     # top-level title for the <title> tag (Frappe reads this automatically)
     context.title = context.screen_title
 
-    context.signages = frappe.db.get_list(
+    # ── Fetch signages for the initial server-rendered slideshow ──────────────
+    # This is a simple fallback render — display.js re-fetches via the
+    # screen-aware API (get_all_signages / get_signages_for_screen) on load
+    # and rebuilds the slides, so this SSR pass mainly avoids a blank flash
+    # before JS executes. Uses the same _format_signage logic as the API so
+    # PDF pages and all fields are consistent.
+    from signage_display.signage_display.doctype.signage.signage import (
+        _SIGNAGE_FIELDS, _format_signage,
+    )
+
+    site_url = frappe.utils.get_url()
+    rows = frappe.db.get_list(
         "Signage",
         filters={"published": 1},
-        fields=[
-            "title", "description", "display_image", "show_title",
-            "content_type", "display_duration", "video_file", "youtube_embed_url",
-        ],
+        fields=_SIGNAGE_FIELDS,
     )
+    context.signages = [_format_signage(r, site_url) for r in rows]
+
     context.signage_height = 80 // (settings.row_count or 1)
     return context

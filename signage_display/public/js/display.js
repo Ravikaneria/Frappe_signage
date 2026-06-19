@@ -25,6 +25,8 @@ let swiper          = null;
 let _lastJson       = null;
 let _ytTimer        = null;   // setTimeout handle for YouTube advancement
 let _ytBarInterval  = null;   // setInterval handle for progress bar animation
+let _pdfPageTimer   = null;   // setInterval handle for PDF page cycling
+let _clockTimer     = null;   // setInterval handle for clock tick
 
 document.addEventListener("DOMContentLoaded", () => {
     initSwiper();
@@ -53,6 +55,9 @@ function initSwiper() {
         const slide = swiper.slides[swiper.activeIndex];
         if (!slide) return;
         const isVideo = !!slide.querySelector("video.sd-video");
+        // PDF and Clock manage their own internal timers but still use the
+        // main swiper.autoplay delay to advance to the NEXT slide, so they
+        // are intentionally excluded here (unlike YouTube/Webpage).
         const isTimedIframe = ["YouTube", "Webpage"].includes(slide.dataset.contentType);
         if (!isVideo && !isTimedIframe) {
             swiper.autoplay.start();
@@ -68,6 +73,8 @@ function handleActiveSlide() {
 
     // Clear any running YouTube timer + progress bar
     clearYouTubeTimer();
+    clearPdfTimer();
+    clearClockTimer();
 
     // Pause all videos
     document.querySelectorAll(".sd-video").forEach(v => {
@@ -154,6 +161,73 @@ function handleActiveSlide() {
             goNext();
         }, durationMs);
     }
+
+    // ── PDF ───────────────────────────────────────────────────────────────────
+    // Cycles through each page image at the configured per-page duration.
+    // The overall slide (Swiper) advances to the NEXT signage only after all
+    // PDF pages have been shown once.
+    else if (contentType === "PDF") {
+        const pages = slide.querySelectorAll(".sd-pdf-page");
+        if (pages.length <= 1) return; // single page or no pages — let normal autoplay advance
+
+        const pageDurationMs = parseInt(slide.dataset.pageDuration) || 8000;
+        let pageIndex = 0;
+
+        // Stop the normal Swiper autoplay timer; we drive advancement ourselves
+        swiper.autoplay.stop();
+
+        _pdfPageTimer = setInterval(() => {
+            pages[pageIndex].classList.remove("active");
+            pageIndex++;
+
+            if (pageIndex >= pages.length) {
+                // All pages shown — advance to next signage in the playlist
+                clearPdfTimer();
+                goNext();
+                return;
+            }
+
+            pages[pageIndex].classList.add("active");
+        }, pageDurationMs);
+    }
+
+    // ── CLOCK ─────────────────────────────────────────────────────────────────
+    // Live-updating clock. Advances to next slide via the normal Swiper
+    // autoplay delay (set from this signage's display_duration).
+    else if (contentType === "Clock") {
+        const wrapper = slide.querySelector(".sd-clock-wrapper");
+        if (!wrapper) return;
+
+        const timeEl   = wrapper.querySelector(".sd-clock-time");
+        const dateEl   = wrapper.querySelector(".sd-clock-date");
+        const format   = wrapper.dataset.format || "24 Hour";
+        const showDate = wrapper.dataset.showDate === "1";
+
+        function tick() {
+            const now = new Date();
+            let h = now.getHours();
+            const m = now.getMinutes().toString().padStart(2, "0");
+            const s = now.getSeconds().toString().padStart(2, "0");
+            let suffix = "";
+
+            if (format === "12 Hour (AM/PM)") {
+                suffix = h >= 12 ? " PM" : " AM";
+                h = h % 12;
+                if (h === 0) h = 12;
+            }
+
+            if (timeEl) timeEl.textContent = `${h.toString().padStart(2, "0")}:${m}:${s}${suffix}`;
+
+            if (showDate && dateEl) {
+                dateEl.textContent = now.toLocaleDateString(undefined, {
+                    weekday: "long", year: "numeric", month: "long", day: "numeric",
+                });
+            }
+        }
+
+        tick();
+        _clockTimer = setInterval(tick, 1000);
+    }
 }
 
 function clearYouTubeTimer() {
@@ -164,6 +238,14 @@ function clearYouTubeTimer() {
         bar.style.transition = "none";
         bar.style.width = "0%";
     });
+}
+
+function clearPdfTimer() {
+    if (_pdfPageTimer) { clearInterval(_pdfPageTimer); _pdfPageTimer = null; }
+}
+
+function clearClockTimer() {
+    if (_clockTimer) { clearInterval(_clockTimer); _clockTimer = null; }
 }
 
 // ── YouTube progress bar ──────────────────────────────────────────────────────
@@ -322,6 +404,33 @@ function buildSlide(s) {
                 <span class="sd-yt-countdown">${formatTime(countdownSecs)}</span>
             </div>`;
 
+    } else if (type === "PDF") {
+        const pages = Array.isArray(s.pdf_pages) ? s.pdf_pages : [];
+        if (pages.length === 0) {
+            inner = `<div class="card-body" style="color:#888;">No PDF pages available.</div>`;
+        } else {
+            const pageImgs = pages.map((url, i) =>
+                `<img src="${esc(url)}" class="sd-pdf-page${i === 0 ? ' active' : ''}" alt="${esc(s.title)} page ${i+1}" />`
+            ).join("");
+            const indicator = pages.length > 1
+                ? `<div class="sd-pdf-page-indicator">1 / ${pages.length}</div>` : "";
+            inner = `<div class="sd-pdf-wrapper">${pageImgs}${indicator}</div>`;
+        }
+
+    } else if (type === "Clock") {
+        const clockFormat   = s.clock_format || "24 Hour";
+        const showDate      = s.clock_show_date ? 1 : 0;
+        const titleHtml2    = s.title ? `<div class="sd-clock-title">${esc(s.title)}</div>` : "";
+        const tzHtml        = s.clock_timezone_label
+            ? `<div class="sd-clock-tz">${esc(s.clock_timezone_label)}</div>` : "";
+        inner = `
+            <div class="sd-clock-wrapper" data-format="${esc(clockFormat)}" data-show-date="${showDate}">
+                ${titleHtml2}
+                <div class="sd-clock-time">--:--</div>
+                <div class="sd-clock-date"></div>
+                ${tzHtml}
+            </div>`;
+
     } else {
         // Text Only — always show title, description is raw HTML from Text Editor
         const txtTitle = s.title ? `<h1 class="card-title">${esc(s.title)}</h1>` : "";
@@ -333,7 +442,11 @@ function buildSlide(s) {
     const timedAttr = (type === "YouTube" || type === "Webpage")
         ? `data-yt-duration="${durationMs}"` : "";
 
-    return `<div class="swiper-slide" data-swiper-autoplay="${durationMs}" data-content-type="${esc(type)}" ${timedAttr}>
+    // PDF page duration (seconds -> ms) stored separately from the overall slide duration
+    const pdfAttr = type === "PDF"
+        ? `data-page-duration="${(s.pdf_page_duration ? s.pdf_page_duration * 1000 : 8000)}"` : "";
+
+    return `<div class="swiper-slide" data-swiper-autoplay="${durationMs}" data-content-type="${esc(type)}" ${timedAttr} ${pdfAttr}>
               <div class="card sd-card">${inner}</div>
             </div>`;
 }
@@ -359,6 +472,8 @@ async function refreshSignages() {
 
     const prev = swiper ? swiper.activeIndex : 0;
     clearYouTubeTimer();
+    clearPdfTimer();
+    clearClockTimer();
     swiper.autoplay.stop();
     swiper.removeAllSlides();
 

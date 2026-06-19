@@ -21,6 +21,14 @@ header,footer,nav,.navbar,.page-header,.breadcrumb-container,.web-footer,#navbar
 .sd-video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;display:block;z-index:0;}
 .sd-youtube{position:absolute;inset:0;width:100%;height:100%;border:none;display:block;}
 .sd-webpage{position:absolute;inset:0;width:100%;height:100%;border:none;display:block;background:#fff;}
+.sd-pdf-wrapper{position:absolute;inset:0;width:100%;height:100%;background:#222;}
+.sd-pdf-page{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity 0.5s ease;}
+.sd-pdf-page.active{opacity:1;}
+.sd-clock-wrapper{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a0a1a;color:#fff;}
+.sd-clock-time{font-size:clamp(4rem,15vw,14rem);font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:0.02em;}
+.sd-clock-date{font-size:clamp(1.2rem,3vw,2.5rem);color:#aab;margin-top:1rem;}
+.sd-clock-title{font-size:clamp(1.5rem,3vw,2.5rem);color:#fff;margin-bottom:1.5rem;}
+.sd-clock-tz{font-size:clamp(1rem,1.5vw,1.5rem);color:#778;margin-top:0.5rem;}
 .card-img-overlay{position:absolute;inset:auto 0 0 0;height:auto;padding:2rem 3rem;background:linear-gradient(transparent,rgba(0,0,0,0.65));color:#fff;z-index:2;}
 .card-title{font-size:clamp(1.8rem,4vw,4rem);font-weight:700;margin-bottom:1rem;text-shadow:0 2px 10px rgba(0,0,0,0.7);}
 .card-text{font-size:clamp(1rem,2vw,2rem);line-height:1.6;}
@@ -45,7 +53,8 @@ header,footer,nav,.navbar,.page-header,.breadcrumb-container,.web-footer,#navbar
       <div class="swiper-slide"
            data-swiper-autoplay="{{ dur_ms }}"
            data-content-type="{{ signage.content_type or 'Image' }}"
-           {% if signage.content_type in ("YouTube", "Webpage") %}data-yt-duration="{{ dur_ms }}"{% endif %}>
+           {% if signage.content_type in ("YouTube", "Webpage") %}data-yt-duration="{{ dur_ms }}"{% endif %}
+           {% if signage.content_type == "PDF" %}data-page-duration="{{ (signage.pdf_page_duration or 8) * 1000 }}"{% endif %}>
         <div class="card sd-card">
 
           {# ── IMAGE ── #}
@@ -94,6 +103,30 @@ header,footer,nav,.navbar,.page-header,.breadcrumb-container,.web-footer,#navbar
                 <div class="sd-yt-progress-bar"></div>
               </div>
               <span class="sd-yt-countdown"></span>
+            </div>
+
+          {# ── PDF — all pages rendered; JS handles page cycling ── #}
+          {% elif signage.content_type == "PDF" %}
+            <div class="sd-pdf-wrapper">
+              {% for page_url in signage.pdf_pages %}
+                <img src="{{ page_url }}" class="sd-pdf-page{{ ' active' if loop.first else '' }}" alt="{{ signage.title }} page {{ loop.index }}" />
+              {% endfor %}
+              {% if signage.pdf_pages and signage.pdf_pages|length > 1 %}
+              <div class="sd-pdf-page-indicator">1 / {{ signage.pdf_pages|length }}</div>
+              {% endif %}
+            </div>
+
+          {# ── CLOCK — live updating clock/date widget ── #}
+          {% elif signage.content_type == "Clock" %}
+            <div class="sd-clock-wrapper"
+                 data-format="{{ signage.clock_format or '24 Hour' }}"
+                 data-show-date="{{ 1 if signage.clock_show_date else 0 }}">
+              {% if signage.title %}<div class="sd-clock-title">{{ signage.title }}</div>{% endif %}
+              <div class="sd-clock-time">--:--</div>
+              <div class="sd-clock-date"></div>
+              {% if signage.clock_timezone_label %}
+              <div class="sd-clock-tz">{{ signage.clock_timezone_label }}</div>
+              {% endif %}
             </div>
 
           {# ── TEXT ONLY ── #}

@@ -1,6 +1,6 @@
 // ── Screen List View ─────────────────────────────────────────────────────────
 frappe.listview_settings["Screen"] = {
-    add_fields: ["is_live", "last_seen", "screen_name", "display_url", "is_active"],
+    add_fields: ["is_live", "last_seen", "screen_name", "display_url", "is_active", "screen_group", "content_mode"],
 
     get_indicator: function(doc) {
         if (!doc.is_active) return [__("Inactive"), "red",   "is_active,=,0"];
@@ -44,6 +44,48 @@ frappe.listview_settings["Screen"] = {
                 frappe.show_alert({ message: `Copied ${selected.length} URL(s)!`, indicator: "green" });
             });
         });
+
+        listview.page.add_action_item(__("Assign to Group"), function() {
+            const selected = listview.get_checked_items();
+            if (!selected.length) {
+                frappe.show_alert({ message: "Select at least one screen first.", indicator: "orange" });
+                return;
+            }
+            const d = new frappe.ui.Dialog({
+                title: __("Assign Screens to Group"),
+                fields: [
+                    {
+                        fieldname: "screen_group",
+                        fieldtype: "Link",
+                        options: "Screen Group",
+                        label: __("Screen Group"),
+                        reqd: 1,
+                    },
+                ],
+                primary_action_label: __("Assign"),
+                primary_action: function(values) {
+                    frappe.call({
+                        method: "signage_display.signage_display.doctype.screen.screen.bulk_assign_group",
+                        args: {
+                            screen_names: JSON.stringify(selected.map(s => s.name)),
+                            screen_group: values.screen_group,
+                        },
+                        freeze: true,
+                        callback: function(r) {
+                            if (r.message) {
+                                frappe.show_alert({
+                                    message: `Assigned ${r.message.updated} screen(s) to ${values.screen_group}`,
+                                    indicator: "green",
+                                });
+                                d.hide();
+                                listview.refresh();
+                            }
+                        },
+                    });
+                },
+            });
+            d.show();
+        });
     },
 };
 
@@ -77,29 +119,19 @@ frappe.ui.form.on("Screen", {
             }, __("Actions"));
         }
 
-        // Show/hide signage table based on toggle
-        frm.trigger("show_all_signages");
+        frm.trigger("content_mode");
     },
 
-    show_all_signages: function(frm) {
-        const showAll = frm.doc.show_all_signages;
-        frm.toggle_display("signages", !showAll);
+    content_mode: function(frm) {
+        const mode = frm.doc.content_mode || "Show All Published";
+        frm.toggle_display("signages", mode === "Manual Signage List");
+        frm.toggle_display("signage_schedule", mode === "Use Schedule");
 
-        if (showAll) {
-            frm.set_df_property("signages", "reqd", 0);
-            frm.dashboard.set_headline_alert(
-                frm.doc.is_live
-                    ? `<span style="color:green;font-weight:bold;">🟢 Live — showing ALL published signages</span>`
-                    : `<span style="color:#888;">Showing ALL published signages when live</span>`,
-                "blue"
+        if (mode === "Use Schedule" && !frm.doc.signage_schedule && frm.doc.screen_group) {
+            frm.set_df_property(
+                "signage_schedule", "description",
+                `No schedule set here — will inherit from group "${frm.doc.screen_group}".`
             );
-        } else {
-            frm.dashboard.clear_headline();
-            if (frm.doc.is_live) {
-                frm.dashboard.set_headline_alert(
-                    `<span style="color:green;font-weight:bold;">🟢 Live — showing assigned signages only</span>`
-                );
-            }
         }
     },
 });

@@ -5,12 +5,18 @@ frappe.ui.form.on("Signage", {
     },
     content_type: function(frm) {
         const t = frm.doc.content_type || "Image";
-        frm.toggle_display("display_image",     t === "Image");
-        frm.toggle_display("video_file",        t === "Video");
-        frm.toggle_display("youtube_url",       t === "YouTube");
-        frm.toggle_display("youtube_embed_url", t === "YouTube");
-        frm.toggle_display("webpage_url",       t === "Webpage");
-        frm.toggle_display("display_duration",  t !== "Video");
+        frm.toggle_display("display_image",      t === "Image");
+        frm.toggle_display("video_file",         t === "Video");
+        frm.toggle_display("youtube_url",        t === "YouTube");
+        frm.toggle_display("youtube_embed_url",  t === "YouTube");
+        frm.toggle_display("webpage_url",        t === "Webpage");
+        frm.toggle_display("pdf_file",           t === "PDF");
+        frm.toggle_display("pdf_page_duration",  t === "PDF");
+        frm.toggle_display("clock_format",       t === "Clock");
+        frm.toggle_display("clock_show_date",    t === "Clock");
+        frm.toggle_display("clock_timezone_label", t === "Clock");
+        // Duration field is per-page for PDF (handled separately), not meaningful for Video
+        frm.toggle_display("display_duration",   t !== "Video" && t !== "PDF");
     },
     youtube_url: function(frm) {
         const url = frm.doc.youtube_url || "";
@@ -41,6 +47,14 @@ frappe.ui.form.on("Signage", {
             message: "Note: the target site must allow embedding (no X-Frame-Options: DENY / SAMEORIGIN).",
             indicator: "blue",
         });
+    },
+    pdf_file: function(frm) {
+        if (frm.doc.pdf_file) {
+            frappe.show_alert({
+                message: "PDF will be converted to slide images on save (each page = one slide).",
+                indicator: "blue",
+            });
+        }
     },
     display_image: function(frm) {
         if (frm.doc.display_image) {
