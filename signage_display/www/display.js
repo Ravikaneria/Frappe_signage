@@ -48,13 +48,13 @@ function initSwiper() {
         loop: false,
     });
 
-    // When autoplay fires, check — if current slide is video or YouTube, suppress it
+    // When autoplay fires, check — if current slide is video, YouTube, or Webpage, suppress it
     swiper.on("autoplayStop", () => {
         const slide = swiper.slides[swiper.activeIndex];
         if (!slide) return;
-        const isVideo   = !!slide.querySelector("video.sd-video");
-        const isYouTube = slide.dataset.contentType === "YouTube";
-        if (!isVideo && !isYouTube) {
+        const isVideo = !!slide.querySelector("video.sd-video");
+        const isTimedIframe = ["YouTube", "Webpage"].includes(slide.dataset.contentType);
+        if (!isVideo && !isTimedIframe) {
             swiper.autoplay.start();
         }
     });
@@ -133,6 +133,22 @@ function handleActiveSlide() {
         }
 
         // Advance after the duration
+        _ytTimer = setTimeout(() => {
+            clearYouTubeTimer();
+            goNext();
+        }, durationMs);
+    }
+
+    // ── WEBPAGE ───────────────────────────────────────────────────────────────
+    // Same timer + progress bar as YouTube — we can't detect "end" of an
+    // arbitrary external webpage, so it advances after its set duration.
+    else if (contentType === "Webpage") {
+        swiper.autoplay.stop();
+
+        const durationMs = parseInt(slide.dataset.ytDuration) || (SD.displayDuration || 60000);
+
+        startProgressBar(slide, durationMs);
+
         _ytTimer = setTimeout(() => {
             clearYouTubeTimer();
             goNext();
@@ -290,6 +306,22 @@ function buildSlide(s) {
                 <span class="sd-yt-countdown">${formatTime(countdownSecs)}</span>
             </div>`;
 
+    } else if (type === "Webpage") {
+        // Fullscreen iframe of an external URL. Same timer-based advancement as YouTube
+        // (we can't detect "end" of an arbitrary webpage), with the same progress bar UX.
+        const countdownSecs = Math.round(durationMs / 1000);
+        inner = `
+            <iframe class="sd-webpage"
+                src="${esc(s.webpage_url)}"
+                allow="autoplay; encrypted-media; fullscreen"
+                allowfullscreen frameborder="0" scrolling="no"></iframe>
+            <div class="sd-yt-bar-wrapper">
+                <div class="sd-yt-bar-track">
+                    <div class="sd-yt-progress-bar"></div>
+                </div>
+                <span class="sd-yt-countdown">${formatTime(countdownSecs)}</span>
+            </div>`;
+
     } else {
         // Text Only — always show title, description is raw HTML from Text Editor
         const txtTitle = s.title ? `<h1 class="card-title">${esc(s.title)}</h1>` : "";
@@ -297,10 +329,11 @@ function buildSlide(s) {
         inner = `<div class="sd-text-only">${txtTitle}${txtDesc}</div>`;
     }
 
-    // Store ytDuration on the slide element so handleActiveSlide can read it
-    const ytAttr = type === "YouTube" ? `data-yt-duration="${durationMs}"` : "";
+    // Store timer duration on the slide for YouTube AND Webpage (both use the timer-based advance)
+    const timedAttr = (type === "YouTube" || type === "Webpage")
+        ? `data-yt-duration="${durationMs}"` : "";
 
-    return `<div class="swiper-slide" data-swiper-autoplay="${durationMs}" data-content-type="${esc(type)}" ${ytAttr}>
+    return `<div class="swiper-slide" data-swiper-autoplay="${durationMs}" data-content-type="${esc(type)}" ${timedAttr}>
               <div class="card sd-card">${inner}</div>
             </div>`;
 }
