@@ -69,9 +69,10 @@ header,footer,nav,.navbar,.page-header,.breadcrumb-container,.web-footer,#navbar
               {% if signage.description %}<p class="card-text">{{ signage.description }}</p>{% endif %}
             </div>
 
-          {# ── VIDEO — no muted so audio plays ── #}
+          {# ── VIDEO — starts muted (guarantees autoplay on all browsers incl. TVBro/WebView),
+               JS attempts to unmute immediately and on first user interaction ── #}
           {% elif signage.content_type == "Video" %}
-            <video class="sd-video" src="{{ signage.video_file }}" autoplay playsinline data-slide-video="1"></video>
+            <video class="sd-video" src="{{ signage.video_file }}" autoplay muted playsinline webkit-playsinline data-slide-video="1"></video>
             {% if signage.show_title or signage.description %}
             <div class="card-img-overlay">
               {% if signage.show_title %}<h1 class="card-title">{{ signage.title }}</h1>{% endif %}

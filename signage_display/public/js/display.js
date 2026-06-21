@@ -29,10 +29,82 @@ let _pdfPageTimer   = null;   // setInterval handle for PDF page cycling
 let _clockTimer     = null;   // setInterval handle for clock tick
 
 document.addEventListener("DOMContentLoaded", () => {
+    // Diagnostic info — visible via remote debugging (chrome://inspect) or
+    // any logcat capture, useful for troubleshooting TVBro/Android TV WebView.
+    console.log("[Signage] User Agent:", navigator.userAgent);
+    console.log("[Signage] Screen ID:", SCREEN_ID || "(none — legacy /display mode)");
+    console.log("[Signage] Viewport:", window.innerWidth + "x" + window.innerHeight);
+
     initSwiper();
     startPolling();
     if (SCREEN_ID) startHeartbeat();
+
+    initWakeLock();
+    startFakeActivitySignal();
 });
+
+// ── Keep the screen awake (prevent Android TV screensaver / sleep) ───────────
+//
+// LIMITATION: a pure web page cannot 100% guarantee blocking the Android TV
+// OS-level screensaver/daydream — that ultimately requires a native app
+// wrapper calling Android's WakeLock APIs directly. These are our two
+// best web-side attempts, which work on many TVBro/WebView builds since
+// TVBro is built on top of Android's WebView component:
+//
+//  1. Screen Wake Lock API (navigator.wakeLock) — the standards-based approach
+//  2. "Fake activity" signal — periodically simulates a tiny, invisible user
+//     interaction (a 1px scroll + immediate scroll-back) to reset the OS
+//     idle/inactivity timer that triggers the screensaver. This is a common
+//     workaround used by real-world digital signage deployments precisely
+//     because option 1 alone isn't always honored by every Android TV build.
+
+let _wakeLock = null;
+
+async function initWakeLock() {
+    if (!("wakeLock" in navigator)) {
+        console.log("[Signage] Wake Lock API not supported by this browser.");
+        if (location.protocol !== "https:") {
+            console.log("[Signage] Note: Wake Lock requires HTTPS — current protocol is", location.protocol);
+        }
+        return;
+    }
+    try {
+        _wakeLock = await navigator.wakeLock.request("screen");
+        console.log("[Signage] Wake Lock acquired.");
+
+        _wakeLock.addEventListener("release", () => {
+            console.log("[Signage] Wake Lock was released — attempting to re-acquire.");
+            _wakeLock = null;
+        });
+    } catch (err) {
+        console.log("[Signage] Wake Lock request failed:", err.name, err.message);
+    }
+}
+
+// Wake locks can be silently released by the browser (e.g. on some
+// visibility-change edge cases). Re-request periodically and whenever
+// the page becomes visible again.
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && !_wakeLock) {
+        initWakeLock();
+    }
+});
+setInterval(() => {
+    if (!_wakeLock) initWakeLock();
+}, 60_000);
+
+function startFakeActivitySignal() {
+    setInterval(() => {
+        // Tiny no-visible-effect scroll to register as "activity" with the
+        // underlying Android WebView/OS idle timer. 1px is imperceptible.
+        window.scrollBy(0, 1);
+        window.scrollBy(0, -1);
+
+        // Also dispatch a synthetic event some WebView builds watch for.
+        document.dispatchEvent(new Event("touchstart"));
+        document.dispatchEvent(new Event("touchend"));
+    }, 4 * 60 * 1000); // every 4 minutes — well under any 15 min idle timeout
+}
 
 // ── Swiper init ───────────────────────────────────────────────────────────────
 function initSwiper() {
@@ -96,12 +168,25 @@ function handleActiveSlide() {
         swiper.autoplay.stop();
         video.currentTime = 0;
 
+        // Video starts muted (set in HTML) — this guarantees autoplay works on
+        // every browser/WebView including TVBro on Android TV, where unmuted
+        // autoplay can silently fail to render the video at all.
+        video.muted = true;
+
         const playPromise = video.play();
         if (playPromise !== undefined) {
+            // Even muted autoplay can occasionally be blocked on some WebViews —
+            // retry once after a short delay if the initial play() rejects.
             playPromise.catch(() => {
-                video.muted = true;
-                video.play().catch(() => {});
+                setTimeout(() => { video.play().catch(() => {}); }, 300);
             });
+        }
+
+        // If the user has already interacted with the screen (tap/click/key),
+        // unmute immediately. Otherwise unmuteAllMedia() will catch it on
+        // first interaction (see below).
+        if (_userInteracted) {
+            video.muted = false;
         }
 
         video.onended = () => { video.onended = null; goNext(); };
@@ -292,6 +377,9 @@ function formatTime(totalSeconds) {
 // We send unMute + playVideo commands to every YouTube iframe on first click.
 let _userInteracted = false;
 
+// Unmutes YouTube iframes AND the currently-active <video> element.
+// Renamed conceptually to "unmute all media" but kept the original function
+// name for compatibility with existing event listeners below.
 function unmuteAllYouTubeIframes() {
     if (_userInteracted) return;
     _userInteracted = true;
@@ -299,6 +387,8 @@ function unmuteAllYouTubeIframes() {
     // Hide the "tap for audio" hint
     const hint = document.getElementById("sd-audio-hint");
     if (hint) { hint.classList.add("hide"); setTimeout(() => hint.remove(), 700); }
+
+    // Unmute YouTube iframes via postMessage
     document.querySelectorAll("iframe.sd-youtube").forEach(iframe => {
         try {
             iframe.contentWindow.postMessage(
@@ -311,12 +401,38 @@ function unmuteAllYouTubeIframes() {
             );
         } catch(e) {}
     });
+
+    // Unmute the currently playing <video> element, if any
+    document.querySelectorAll("video.sd-video").forEach(video => {
+        video.muted = false;
+        // Some WebViews need play() called again after unmuting to actually
+        // produce audio output.
+        video.play().catch(() => {});
+    });
 }
 
-// Listen for any user interaction to unmute
-["click", "touchstart", "keydown"].forEach(evt => {
+// Listen for any user interaction to unmute.
+// TV remotes typically fire 'keydown' (D-pad/OK button) rather than
+// click/touchstart, so keydown is critical for Android TV / TVBro.
+// 'pointerdown' is included as a broader catch-all across input types.
+["click", "touchstart", "keydown", "pointerdown"].forEach(evt => {
     document.addEventListener(evt, unmuteAllYouTubeIframes, { once: false, passive: true });
 });
+
+// Fallback for unattended displays where no remote button is ever pressed:
+// many TV WebViews (including TVBro) actually DO allow muted->unmuted audio
+// switching via a script-only call once the page has been open a few
+// seconds, even without a user gesture. This is best-effort — if the
+// browser blocks it, audio simply stays muted, which is a safe failure mode
+// for unattended signage (silent video is far better than no video).
+setTimeout(() => {
+    if (!_userInteracted) {
+        document.querySelectorAll("video.sd-video").forEach(video => {
+            video.muted = false;
+            video.play().catch(() => { video.muted = true; });
+        });
+    }
+}, 5000);
 
 function goNext() {
     if (!swiper) return;
@@ -370,7 +486,7 @@ function buildSlide(s) {
             : `<div class="card-body">${titleHtml}${descHtml}</div>`;
 
     } else if (type === "Video") {
-        inner = `<video class="sd-video" src="${esc(s.video_file)}" playsinline data-slide-video="1"></video>
+        inner = `<video class="sd-video" src="${esc(s.video_file)}" muted playsinline webkit-playsinline data-slide-video="1"></video>
                  ${(titleHtml || descHtml) ? `<div class="card-img-overlay">${titleHtml}${descHtml}</div>` : ""}`;
 
     } else if (type === "YouTube") {
