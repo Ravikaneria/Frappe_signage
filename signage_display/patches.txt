@@ -1,3 +1,1 @@
-# Patches for signage_display
-# Format: signage_display.patches.<module>.<function>
-# (No patches needed for fresh installs on Frappe v15)
+signage_display.patches.enable_new_button_on_doctypes
