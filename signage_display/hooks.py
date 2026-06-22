@@ -1,10 +1,10 @@
 app_name = "signage_display"
 app_title = "Signage Display"
-app_publisher = "Highflyer Global Innovations"
-app_description = "Display Signage Boards"
-app_email = "hello@hfgi.co.uk"
+app_publisher = "H.P. Automation Pvt. Ltd."
+app_description = "Digital Signage Display"
+app_email = "ravi.kaneria@hpautomation.in"
 app_license = "MIT"
-app_version = "0.0.2"
+app_version = "2.0.0"
 
 website_route_rules = [
     {"from_route": "/display/<path:screen_id>", "to_route": "display"},

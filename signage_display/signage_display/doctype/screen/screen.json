@@ -1,8 +1,8 @@
 {
  "actions": [],
  "allow_rename": 0,
- "autoname": "naming_series:",
- "creation": "2026-06-16 00:00:00.000000",
+ "autoname": "field:screen_id",
+ "creation": "2026-06-22 00:00:00.000000",
  "default_view": "List",
  "doctype": "DocType",
  "editable_grid": 1,
@@ -11,19 +11,17 @@
   "screen_id",
   "screen_name",
   "col_break_1",
-  "screen_group",
   "is_active",
   "is_live",
   "last_seen",
   "sec_url",
   "display_url",
-  "sec_signage",
-  "content_mode",
-  "show_all_signages",
-  "signage_schedule",
-  "signages",
-  "sec_notes",
-  "location_notes"
+  "sec_playlist",
+  "default_playlist",
+  "sec_schedule",
+  "schedule",
+  "sec_location",
+  "location"
  ],
  "fields": [
   {
@@ -32,9 +30,9 @@
    "in_list_view": 1,
    "label": "Screen ID",
    "read_only": 1,
-   "unique": 1,
    "bold": 1,
-   "description": "Auto-generated on save. Used in the display URL."
+   "unique": 1,
+   "description": "Auto-generated 5-digit code. Shown on TV app for pairing."
   },
   {
    "fieldname": "screen_name",
@@ -46,14 +44,6 @@
   {
    "fieldname": "col_break_1",
    "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "screen_group",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Screen Group",
-   "options": "Screen Group",
-   "description": "Optional. Group screens for bulk schedule assignment."
   },
   {
    "default": "1",
@@ -87,82 +77,61 @@
    "fieldtype": "Data",
    "label": "Display URL",
    "read_only": 1,
-   "description": "Open this URL on the TV or display screen."
+   "description": "Open this URL on the display screen or enter the Screen ID in the TV app."
   },
   {
-   "fieldname": "sec_signage",
+   "fieldname": "sec_playlist",
    "fieldtype": "Section Break",
-   "label": "Signage Assignment"
+   "label": "Default Playlist"
   },
   {
-   "fieldname": "content_mode",
-   "fieldtype": "Select",
-   "label": "Content Mode",
-   "options": "Show All Published\nManual Signage List\nUse Schedule",
-   "default": "Show All Published",
-   "description": "Show All Published: every published Signage. Manual Signage List: only the signages assigned below. Use Schedule: time/day-based rules decide content automatically."
-  },
-  {
-   "fieldname": "show_all_signages",
-   "fieldtype": "Check",
-   "label": "Show All Published Signages (legacy)",
-   "default": "1",
-   "hidden": 1,
-   "description": "Deprecated \u2014 kept for backward compatibility, auto-synced from Content Mode."
-  },
-  {
-   "fieldname": "signage_schedule",
+   "fieldname": "default_playlist",
    "fieldtype": "Link",
-   "label": "Signage Schedule",
-   "options": "Signage Schedule",
-   "depends_on": "eval:doc.content_mode=='Use Schedule'",
-   "description": "Leave blank to inherit the Schedule from this screen's Group."
+   "label": "Default Playlist",
+   "options": "Playlist",
+   "description": "Plays when no schedule slot matches the current time. If not set, screen shows 'Please check playlist'."
   },
   {
-   "fieldname": "signages",
-   "fieldtype": "Table",
-   "label": "Assigned Signages",
-   "options": "Screen Signage Item",
-   "depends_on": "eval:doc.content_mode=='Manual Signage List'",
-   "description": "Add signages in the order you want them displayed on this screen."
-  },
-  {
-   "fieldname": "sec_notes",
+   "fieldname": "sec_schedule",
    "fieldtype": "Section Break",
-   "label": "Location / Notes"
+   "label": "Schedule"
   },
   {
-   "fieldname": "location_notes",
+   "fieldname": "schedule",
+   "fieldtype": "Table",
+   "label": "Schedule",
+   "options": "Screen Schedule",
+   "description": "Add time slots. If current time matches a slot, that slot's Playlist plays. If nothing matches, Default Playlist plays."
+  },
+  {
+   "fieldname": "sec_location",
+   "fieldtype": "Section Break",
+   "label": "Location"
+  },
+  {
+   "fieldname": "location",
    "fieldtype": "Small Text",
-   "label": "Location / Notes"
+   "label": "Location / Notes",
+   "description": "e.g. Reception, Floor 2, Conference Room A"
   }
  ],
  "icon": "fa fa-tv",
- "in_create": 0,
+ "in_create": 1,
  "links": [],
- "modified": "2026-06-16 00:00:00.000000",
+ "modified": "2026-06-22 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Signage Display",
  "name": "Screen",
  "owner": "Administrator",
  "permissions": [
   {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "System Manager",
-   "share": 1,
-   "write": 1
+   "create": 1, "delete": 1, "email": 1, "export": 1,
+   "print": 1, "read": 1, "report": 1,
+   "role": "System Manager", "share": 1, "write": 1
   }
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
- "track_changes": 1,
- "migration_hash": null,
- "naming_series": "SCR-.#####"
+ "track_changes": 1
 }
