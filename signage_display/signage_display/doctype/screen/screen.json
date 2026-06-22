@@ -1,13 +1,14 @@
 {
  "actions": [],
  "allow_rename": 0,
- "autoname": "field:screen_id",
+ "autoname": "naming_series:",
  "creation": "2026-06-22 00:00:00.000000",
  "default_view": "List",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "naming_series",
   "screen_id",
   "screen_name",
   "col_break_1",
@@ -24,6 +25,17 @@
   "location"
  ],
  "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "no_copy": 1,
+   "options": "",
+   "print_hide": 1,
+   "read_only": 0,
+   "set_only_once": 0,
+   "unique": 0
+  },
   {
    "fieldname": "screen_id",
    "fieldtype": "Data",
@@ -176,5 +188,6 @@
  "track_changes": 0,
  "is_submittable": 0,
  "migration_hash": null,
- "index_web_pages_for_search": 0
+ "index_web_pages_for_search": 0,
+ "naming_series": "SCR-.#####"
 }
