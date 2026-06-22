@@ -93,7 +93,7 @@
    "fieldtype": "Data",
    "label": "URL",
    "depends_on": "eval:doc.content_type=='URL Redirect'",
-   "description": "Any URL — displayed fullscreen as an iframe."
+   "description": "Any URL \u2014 displayed fullscreen as an iframe."
   },
   {
    "fieldname": "pdf_file",
@@ -105,7 +105,7 @@
   {
    "fieldname": "pdf_pages_json",
    "fieldtype": "Long Text",
-   "label": "PDF Pages (internal — do not edit)",
+   "label": "PDF Pages (internal \u2014 do not edit)",
    "hidden": 1,
    "read_only": 1,
    "no_copy": 1
@@ -130,7 +130,7 @@
    "fieldtype": "Data",
    "label": "Label (optional)",
    "depends_on": "eval:doc.content_type=='Clock'",
-   "description": "e.g. IST or Mumbai Office — shown below the clock."
+   "description": "e.g. IST or Mumbai Office \u2014 shown below the clock."
   },
   {
    "fieldname": "sec_notes",
@@ -154,13 +154,41 @@
  "owner": "Administrator",
  "permissions": [
   {
-   "create": 1, "delete": 1, "email": 1, "export": 1,
-   "print": 1, "read": 1, "report": 1,
-   "role": "System Manager", "share": 1, "write": 1
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Administrator",
+   "share": 1,
+   "write": 1,
+   "submit": 0,
+   "cancel": 0,
+   "amend": 0
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1,
+   "submit": 0,
+   "cancel": 0,
+   "amend": 0
   }
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
- "track_changes": 0
+ "track_changes": 0,
+ "is_submittable": 0,
+ "migration_hash": null,
+ "index_web_pages_for_search": 0
 }

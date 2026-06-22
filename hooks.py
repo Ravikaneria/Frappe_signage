@@ -15,3 +15,10 @@ scheduler_events = {
         "signage_display.signage_display.doctype.screen.screen.mark_screens_offline"
     ]
 }
+
+# Runs once when app is installed — sets up DocType permissions in the database.
+# This is the most reliable fix for "New button missing" on Frappe Cloud.
+after_install = "signage_display.install.install.after_install"
+
+# Also run after every migrate to keep permissions in sync
+after_migrate = "signage_display.install.install.after_install"

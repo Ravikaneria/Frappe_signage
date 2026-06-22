@@ -115,5 +115,8 @@
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
- "track_changes": 0
+ "track_changes": 0,
+ "in_create": 0,
+ "is_submittable": 0,
+ "migration_hash": null
 }
