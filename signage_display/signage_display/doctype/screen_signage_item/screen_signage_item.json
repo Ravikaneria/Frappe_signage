@@ -1,43 +1,51 @@
 {
  "actions": [],
- "creation": "2026-06-22 00:00:00.000000",
+ "creation": "2026-06-16 00:00:00.000000",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "content",
-  "content_type",
-  "duration_sec",
+  "signage",
+  "signage_title",
+  "duration_override",
   "col_break_1",
+  "content_type",
   "is_active"
  ],
  "fields": [
   {
-   "fieldname": "content",
+   "fieldname": "signage",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Content",
-   "options": "Content",
+   "label": "Signage",
+   "options": "Signage",
    "reqd": 1,
    "bold": 1
+  },
+  {
+   "fieldname": "signage_title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "fetch_from": "signage.title",
+   "fetch_if_empty": 1,
+   "read_only": 1
   },
   {
    "fieldname": "content_type",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Type",
-   "fetch_from": "content.content_type",
+   "fetch_from": "signage.content_type",
    "fetch_if_empty": 1,
    "read_only": 1
   },
   {
-   "fieldname": "duration_sec",
+   "fieldname": "duration_override",
    "fieldtype": "Int",
    "in_list_view": 1,
-   "label": "Duration (seconds)",
-   "default": "10",
-   "reqd": 1,
-   "description": "How long this item shows before advancing. For Video, 0 = play to end."
+   "label": "Duration (sec)",
+   "description": "Override slide duration for this screen. 0 = use the Signage default."
   },
   {
    "fieldname": "col_break_1",
@@ -54,17 +62,14 @@
  "index_web_pages_for_search": 0,
  "istable": 1,
  "links": [],
- "modified": "2026-06-22 00:00:00.000000",
+ "modified": "2026-06-16 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Signage Display",
- "name": "Playlist Item",
+ "name": "Screen Signage Item",
  "owner": "Administrator",
  "permissions": [],
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
- "track_changes": 0,
- "in_create": 0,
- "is_submittable": 0,
- "migration_hash": null
+ "track_changes": 0
 }

@@ -1,14 +1,14 @@
 [project]
 name = "signage_display"
 authors = [
-    {name = "H.P. Automation Pvt. Ltd.", email = "ravi.kaneria@hpautomation.in"}
+    {name = "Highflyer Global Innovations", email = "hello@hfgi.co.uk"}
 ]
-description = "Digital Signage Display for H.P. Automation"
+description = "A Frappe app for creating digital signage display boards"
 requires-python = ">=3.10"
 readme = "README.md"
 license = {text = "MIT"}
 dynamic = ["version"]
-dependencies = ["PyMuPDF>=1.23.0"]
+dependencies = []
 
 [tool.flit.module]
 name = "signage_display"

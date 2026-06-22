@@ -2,13 +2,12 @@
  "actions": [],
  "allow_rename": 0,
  "autoname": "naming_series:",
- "creation": "2026-06-22 00:00:00.000000",
+ "creation": "2026-06-16 00:00:00.000000",
  "default_view": "List",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "naming_series",
   "screen_id",
   "screen_name",
   "col_break_1",
@@ -17,34 +16,22 @@
   "last_seen",
   "sec_url",
   "display_url",
-  "sec_playlist",
-  "default_playlist",
-  "sec_schedule",
-  "schedule",
-  "sec_location",
-  "location"
+  "sec_signage",
+  "show_all_signages",
+  "signages",
+  "sec_notes",
+  "location_notes"
  ],
  "fields": [
-  {
-   "fieldname": "naming_series",
-   "fieldtype": "Select",
-   "label": "Series",
-   "no_copy": 1,
-   "options": "",
-   "print_hide": 1,
-   "read_only": 0,
-   "set_only_once": 0,
-   "unique": 0
-  },
   {
    "fieldname": "screen_id",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Screen ID",
    "read_only": 1,
-   "bold": 1,
    "unique": 1,
-   "description": "Auto-generated 5-digit code. Shown on TV app for pairing."
+   "bold": 1,
+   "description": "Auto-generated on save. Used in the display URL."
   },
   {
    "fieldname": "screen_name",
@@ -89,48 +76,43 @@
    "fieldtype": "Data",
    "label": "Display URL",
    "read_only": 1,
-   "description": "Open this URL on the display screen or enter the Screen ID in the TV app."
+   "description": "Open this URL on the TV or display screen."
   },
   {
-   "fieldname": "sec_playlist",
+   "fieldname": "sec_signage",
    "fieldtype": "Section Break",
-   "label": "Default Playlist"
+   "label": "Signage Assignment"
   },
   {
-   "fieldname": "default_playlist",
-   "fieldtype": "Link",
-   "label": "Default Playlist",
-   "options": "Playlist",
-   "description": "Plays when no schedule slot matches the current time. If not set, screen shows 'Please check playlist'."
+   "default": "1",
+   "fieldname": "show_all_signages",
+   "fieldtype": "Check",
+   "label": "Show All Published Signages",
+   "description": "If checked, this screen shows all published signages. Uncheck to assign specific signages below."
   },
   {
-   "fieldname": "sec_schedule",
-   "fieldtype": "Section Break",
-   "label": "Schedule"
-  },
-  {
-   "fieldname": "schedule",
+   "fieldname": "signages",
    "fieldtype": "Table",
-   "label": "Schedule",
-   "options": "Screen Schedule",
-   "description": "Add time slots. If current time matches a slot, that slot's Playlist plays. If nothing matches, Default Playlist plays."
+   "label": "Assigned Signages",
+   "options": "Screen Signage Item",
+   "depends_on": "eval:!doc.show_all_signages",
+   "description": "Add signages in the order you want them displayed on this screen."
   },
   {
-   "fieldname": "sec_location",
+   "fieldname": "sec_notes",
    "fieldtype": "Section Break",
-   "label": "Location"
+   "label": "Location / Notes"
   },
   {
-   "fieldname": "location",
+   "fieldname": "location_notes",
    "fieldtype": "Small Text",
-   "label": "Location / Notes",
-   "description": "e.g. Reception, Floor 2, Conference Room A"
+   "label": "Location / Notes"
   }
  ],
  "icon": "fa fa-tv",
- "in_create": 1,
+ "in_create": 0,
  "links": [],
- "modified": "2026-06-22 00:00:00.000000",
+ "modified": "2026-06-16 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Signage Display",
  "name": "Screen",
@@ -144,50 +126,15 @@
    "print": 1,
    "read": 1,
    "report": 1,
+   "role": "System Manager",
    "share": 1,
-   "write": 1,
-   "submit": 0,
-   "cancel": 0,
-   "amend": 0,
-   "role": "Administrator"
-  },
-  {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "share": 1,
-   "write": 1,
-   "submit": 0,
-   "cancel": 0,
-   "amend": 0,
-   "role": "System Manager"
-  },
-  {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "share": 1,
-   "write": 1,
-   "submit": 0,
-   "cancel": 0,
-   "amend": 0,
-   "role": "System Integrator"
+   "write": 1
   }
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
- "track_changes": 0,
- "is_submittable": 0,
+ "track_changes": 1,
  "migration_hash": null,
- "index_web_pages_for_search": 0,
  "naming_series": "SCR-.#####"
 }

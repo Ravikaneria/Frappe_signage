@@ -1,339 +1,370 @@
 /**
- * display.js — Signage Display Player v2
+ * display.js — Signage Display Player
  *
- * Content types: Image · Video · YouTube · Webpage · URL Redirect · PDF · Clock
- * Scheduling: server-side (get_content_for_screen returns active playlist items)
- * Wake lock: attempted via Web API; native wake lock handled by Android TV app
+ * YouTube fixes:
+ *  - Swiper autoplay stopped for YouTube slides (same as video)
+ *  - YouTube advances after its display_duration (not global 20s)
+ *  - Countdown progress bar shown for YouTube slides
+ *
+ * Video fixes (kept from before):
+ *  - Audio plays, advances on 'ended' event
+ *  - Safety timeout = 3 hours
  */
 "use strict";
 
 const SD = window._sd || {};
-const SCREEN_ID    = SD.screenId || "";
-const GLOBAL_MS    = SD.globalDuration || 10000;
-const POLL_MS      = 30_000;
-const HEARTBEAT_MS = 30_000;
+const SCREEN_ID        = SD.screenId || "";
+const POLL_INTERVAL_MS = 30_000;
+const HEARTBEAT_MS     = 30_000;
 
-const API_CONTENT  = "/api/method/signage_display.signage_display.doctype.screen.screen.get_content_for_screen";
-const API_HB       = "/api/method/signage_display.signage_display.doctype.screen.screen.screen_heartbeat";
+const API_ALL    = "/api/method/signage_display.signage_display.doctype.signage.signage.get_all_signages";
+const API_SCREEN = "/api/method/signage_display.signage_display.doctype.signage.signage.get_signages_for_screen";
+const API_HB     = "/api/method/signage_display.signage_display.doctype.signage.signage.screen_heartbeat";
 
-let swiper         = null;
-let _lastJson      = null;
-let _ytTimer       = null;
-let _ytBarInterval = null;
-let _pdfTimer      = null;
-let _clockTimer    = null;
-let _wakeLock      = null;
-let _userInteracted = false;
+let swiper          = null;
+let _lastJson       = null;
+let _ytTimer        = null;   // setTimeout handle for YouTube advancement
+let _ytBarInterval  = null;   // setInterval handle for progress bar animation
 
-// ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
-    console.log("[Signage v2] Screen ID:", SCREEN_ID || "(none)");
-    console.log("[Signage v2] Viewport:", window.innerWidth + "×" + window.innerHeight);
-
     initSwiper();
     startPolling();
     if (SCREEN_ID) startHeartbeat();
-    initWakeLock();
-    startFakeActivitySignal();
-    setupAudioUnmute();
 });
 
-// ── Wake Lock ─────────────────────────────────────────────────────────────────
-async function initWakeLock() {
-    if (!("wakeLock" in navigator)) return;
-    try {
-        _wakeLock = await navigator.wakeLock.request("screen");
-    } catch (_) {}
-}
-document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && !_wakeLock) initWakeLock();
-});
-setInterval(() => { if (!_wakeLock) initWakeLock(); }, 60_000);
-
-function startFakeActivitySignal() {
-    setInterval(() => {
-        window.scrollBy(0, 1);
-        window.scrollBy(0, -1);
-        document.dispatchEvent(new Event("touchstart"));
-        document.dispatchEvent(new Event("touchend"));
-    }, 4 * 60 * 1000);
-}
-
-// ── Audio Unmute (muted → unmuted on first user interaction) ──────────────────
-function setupAudioUnmute() {
-    ["click", "touchstart", "keydown", "pointerdown"].forEach(evt =>
-        document.addEventListener(evt, handleUserInteraction, { passive: true })
-    );
-    // Fallback auto-unmute after 5s (works on some Android TV WebViews)
-    setTimeout(() => {
-        document.querySelectorAll("video.sd-video").forEach(v => {
-            v.muted = false;
-            v.play().catch(() => { v.muted = true; });
-        });
-    }, 5000);
-}
-
-function handleUserInteraction() {
-    if (_userInteracted) return;
-    _userInteracted = true;
-    const hint = document.getElementById("sd-audio-hint");
-    if (hint) { hint.classList.add("hide"); setTimeout(() => hint.remove(), 700); }
-    // Unmute YouTube iframes
-    document.querySelectorAll("iframe.sd-youtube").forEach(iframe => {
-        try {
-            iframe.contentWindow.postMessage(JSON.stringify({ event: "command", func: "unMute", args: [] }), "*");
-            iframe.contentWindow.postMessage(JSON.stringify({ event: "command", func: "setVolume", args: [100] }), "*");
-        } catch (_) {}
-    });
-    // Unmute videos
-    document.querySelectorAll("video.sd-video").forEach(v => {
-        v.muted = false;
-        v.play().catch(() => {});
-    });
-}
-
-// ── Swiper ────────────────────────────────────────────────────────────────────
+// ── Swiper init ───────────────────────────────────────────────────────────────
 function initSwiper() {
     swiper = new Swiper(".sd-swiper", {
         speed: 1200,
-        autoplay: { delay: GLOBAL_MS, disableOnInteraction: false },
+        direction: "horizontal",
+        autoplay: {
+            delay: SD.displayDuration || 20000,
+            disableOnInteraction: false,
+        },
+        slidesPerView: SD.columnCount || 1,
+        grid: { rows: SD.rowCount || 1, fill: "row" },
+        spaceBetween: 0,
         pagination: { el: ".swiper-pagination", clickable: true },
         loop: false,
     });
+
+    // When autoplay fires, check — if current slide is video, YouTube, or Webpage, suppress it
     swiper.on("autoplayStop", () => {
         const slide = swiper.slides[swiper.activeIndex];
         if (!slide) return;
-        const t = slide.dataset.contentType || "";
-        if (!["Video", "YouTube", "Webpage", "URL Redirect"].includes(t))
+        const isVideo = !!slide.querySelector("video.sd-video");
+        const isTimedIframe = ["YouTube", "Webpage"].includes(slide.dataset.contentType);
+        if (!isVideo && !isTimedIframe) {
             swiper.autoplay.start();
+        }
     });
+
     swiper.on("slideChangeTransitionEnd", handleActiveSlide);
 }
 
-// ── Active Slide Handler ──────────────────────────────────────────────────────
+// ── Active slide handler ──────────────────────────────────────────────────────
 function handleActiveSlide() {
     if (!swiper) return;
-    clearTimers();
 
-    document.querySelectorAll("video.sd-video").forEach(v => {
-        v.pause(); v.currentTime = 0; v.onended = null;
+    // Clear any running YouTube timer + progress bar
+    clearYouTubeTimer();
+
+    // Pause all videos
+    document.querySelectorAll(".sd-video").forEach(v => {
+        v.pause();
+        v.currentTime = 0;
+        v.onended = null;
     });
 
     const slide = swiper.slides[swiper.activeIndex];
     if (!slide) return;
-    const t = slide.dataset.contentType || "Image";
 
-    if (t === "Video") {
+    const contentType = slide.dataset.contentType || "Image";
+
+    // ── VIDEO ─────────────────────────────────────────────────────────────────
+    if (contentType === "Video") {
         const video = slide.querySelector("video.sd-video");
         if (!video) return;
+
         swiper.autoplay.stop();
-        video.muted = true;
         video.currentTime = 0;
-        video.play().catch(() => setTimeout(() => video.play().catch(() => {}), 300));
-        if (_userInteracted) { video.muted = false; }
+
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(() => {
+                video.muted = true;
+                video.play().catch(() => {});
+            });
+        }
+
         video.onended = () => { video.onended = null; goNext(); };
-        setTimeout(() => { if (video.onended) { video.onended = null; goNext(); } }, 3 * 60 * 60 * 1000);
+
+        // Safety — 3 hours, won't fire for normal videos
+        setTimeout(() => {
+            if (video.onended) { video.onended = null; goNext(); }
+        }, 3 * 60 * 60 * 1000);
     }
 
-    else if (t === "YouTube" || t === "Webpage" || t === "URL Redirect") {
+    // ── YOUTUBE ───────────────────────────────────────────────────────────────
+    else if (contentType === "YouTube") {
         swiper.autoplay.stop();
-        const durationMs = parseInt(slide.dataset.durationMs) || GLOBAL_MS;
+
+        // Read duration from the slide's data attribute (set during buildSlide)
+        const durationMs = parseInt(slide.dataset.ytDuration) || (SD.displayDuration || 60000);
+
+        // Show and animate the progress bar
         startProgressBar(slide, durationMs);
-        _ytTimer = setTimeout(() => { clearTimers(); goNext(); }, durationMs);
 
-        // Try unmuting YouTube after load
-        if (t === "YouTube") {
-            const iframe = slide.querySelector("iframe.sd-youtube");
-            if (iframe) {
-                setTimeout(() => {
-                    try {
-                        iframe.contentWindow.postMessage(JSON.stringify({ event: "command", func: "unMute", args: [] }), "*");
-                        iframe.contentWindow.postMessage(JSON.stringify({ event: "command", func: "setVolume", args: [100] }), "*");
-                    } catch (_) {}
-                }, 1500);
-            }
+        // Try to unmute immediately (works if user has already interacted)
+        const ytIframe = slide.querySelector("iframe.sd-youtube");
+        if (ytIframe) {
+            setTimeout(() => {
+                try {
+                    ytIframe.contentWindow.postMessage(
+                        JSON.stringify({ event: "command", func: "unMute", args: [] }),
+                        "*"
+                    );
+                    ytIframe.contentWindow.postMessage(
+                        JSON.stringify({ event: "command", func: "setVolume", args: [100] }),
+                        "*"
+                    );
+                } catch(e) {}
+            }, 1500); // wait 1.5s for iframe to fully load
         }
+
+        // Advance after the duration
+        _ytTimer = setTimeout(() => {
+            clearYouTubeTimer();
+            goNext();
+        }, durationMs);
     }
 
-    else if (t === "PDF") {
-        const pages = slide.querySelectorAll(".sd-pdf-page");
-        if (pages.length <= 1) return;
+    // ── WEBPAGE ───────────────────────────────────────────────────────────────
+    // Same timer + progress bar as YouTube — we can't detect "end" of an
+    // arbitrary external webpage, so it advances after its set duration.
+    else if (contentType === "Webpage") {
         swiper.autoplay.stop();
-        const pageDurationMs = parseInt(slide.dataset.pageDurationMs) || 8000;
-        let idx = 0;
-        const indicator = slide.querySelector(".sd-pdf-indicator");
-        _pdfTimer = setInterval(() => {
-            pages[idx].classList.remove("active");
-            idx++;
-            if (idx >= pages.length) { clearTimers(); goNext(); return; }
-            pages[idx].classList.add("active");
-            if (indicator) indicator.textContent = `${idx + 1} / ${pages.length}`;
-        }, pageDurationMs);
-    }
 
-    else if (t === "Clock") {
-        const wrapper = slide.querySelector(".sd-clock-wrapper");
-        if (!wrapper) return;
-        const timeEl  = wrapper.querySelector(".sd-clock-time");
-        const dateEl  = wrapper.querySelector(".sd-clock-date");
-        const format  = wrapper.dataset.format || "24 Hour";
-        const showDate = wrapper.dataset.showDate === "1";
-        function tick() {
-            const now = new Date();
-            let h = now.getHours(), suffix = "";
-            const m = String(now.getMinutes()).padStart(2, "0");
-            const s = String(now.getSeconds()).padStart(2, "0");
-            if (format === "12 Hour (AM/PM)") {
-                suffix = h >= 12 ? " PM" : " AM";
-                h = h % 12 || 12;
-            }
-            if (timeEl) timeEl.textContent = `${String(h).padStart(2, "0")}:${m}:${s}${suffix}`;
-            if (showDate && dateEl) dateEl.textContent = now.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-        }
-        tick();
-        _clockTimer = setInterval(tick, 1000);
+        const durationMs = parseInt(slide.dataset.ytDuration) || (SD.displayDuration || 60000);
+
+        startProgressBar(slide, durationMs);
+
+        _ytTimer = setTimeout(() => {
+            clearYouTubeTimer();
+            goNext();
+        }, durationMs);
     }
 }
 
-function clearTimers() {
-    if (_ytTimer)       { clearTimeout(_ytTimer);       _ytTimer = null; }
+function clearYouTubeTimer() {
+    if (_ytTimer)       { clearTimeout(_ytTimer);   _ytTimer = null; }
     if (_ytBarInterval) { clearInterval(_ytBarInterval); _ytBarInterval = null; }
-    if (_pdfTimer)      { clearInterval(_pdfTimer);     _pdfTimer = null; }
-    if (_clockTimer)    { clearInterval(_clockTimer);   _clockTimer = null; }
-    document.querySelectorAll(".sd-yt-progress-bar").forEach(b => {
-        b.style.transition = "none"; b.style.width = "0%";
+    // Reset all progress bars
+    document.querySelectorAll(".sd-yt-progress-bar").forEach(bar => {
+        bar.style.transition = "none";
+        bar.style.width = "0%";
     });
 }
 
-function goNext() {
-    if (!swiper) return;
-    swiper.activeIndex >= swiper.slides.length - 1
-        ? swiper.slideTo(0, 800) : swiper.slideNext(800);
-    swiper.autoplay.start();
-}
-
-// ── Progress Bar (YouTube/Webpage) ────────────────────────────────────────────
+// ── YouTube progress bar ──────────────────────────────────────────────────────
 function startProgressBar(slide, durationMs) {
-    const bar   = slide.querySelector(".sd-yt-progress-bar");
-    const label = slide.querySelector(".sd-yt-countdown");
+    const bar = slide.querySelector(".sd-yt-progress-bar");
     if (!bar) return;
-    bar.style.transition = "none"; bar.style.width = "0%";
+
+    bar.style.transition = "none";
+    bar.style.width = "0%";
+
+    // Force reflow so transition starts from 0
     void bar.offsetWidth;
-    bar.style.transition = `width ${durationMs}ms linear`; bar.style.width = "100%";
+
+    bar.style.transition = `width ${durationMs}ms linear`;
+    bar.style.width = "100%";
+
+    // Update the countdown label every second
+    const label = slide.querySelector(".sd-yt-countdown");
     if (!label) return;
+
     let remaining = Math.round(durationMs / 1000);
-    label.textContent = fmt(remaining);
+    label.textContent = formatTime(remaining);
+
     _ytBarInterval = setInterval(() => {
-        remaining--;
-        label.textContent = remaining > 0 ? fmt(remaining) : "0:00";
-        if (remaining <= 0) { clearInterval(_ytBarInterval); _ytBarInterval = null; }
+        remaining -= 1;
+        if (remaining <= 0) {
+            label.textContent = "0:00";
+            clearInterval(_ytBarInterval);
+            _ytBarInterval = null;
+        } else {
+            label.textContent = formatTime(remaining);
+        }
     }, 1000);
 }
 
-function fmt(s) { return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
-
-// ── Slide Builder ─────────────────────────────────────────────────────────────
-function buildSlide(item) {
-    const t         = item.content_type || "Image";
-    const durationMs = (item.duration_sec || 0) * 1000 || GLOBAL_MS;
-
-    let inner = "";
-
-    if (t === "Image") {
-        inner = item.media_image
-            ? `<img src="${e(item.media_image)}" class="sd-img" alt="${e(item.content_name)}" />`
-            : `<div class="sd-no-playlist" style="position:absolute;inset:0;">No image set.</div>`;
-    }
-    else if (t === "Video") {
-        inner = `<video class="sd-video" src="${e(item.video_file)}" muted playsinline webkit-playsinline></video>`;
-    }
-    else if (t === "YouTube") {
-        inner = `
-            <iframe class="sd-youtube" src="${e(item.youtube_embed_url)}" allow="autoplay; encrypted-media; fullscreen" allowfullscreen frameborder="0"></iframe>
-            <div class="sd-yt-bar-wrapper"><div class="sd-yt-bar-track"><div class="sd-yt-progress-bar"></div></div><span class="sd-yt-countdown">${fmt(Math.round(durationMs / 1000))}</span></div>`;
-    }
-    else if (t === "Webpage" || t === "URL Redirect") {
-        const src = t === "Webpage" ? item.webpage_url : item.redirect_url;
-        inner = `
-            <iframe class="sd-webpage" src="${e(src)}" allow="autoplay; encrypted-media; fullscreen" allowfullscreen frameborder="0" scrolling="no"></iframe>
-            <div class="sd-yt-bar-wrapper"><div class="sd-yt-bar-track"><div class="sd-yt-progress-bar"></div></div><span class="sd-yt-countdown">${fmt(Math.round(durationMs / 1000))}</span></div>`;
-    }
-    else if (t === "PDF") {
-        const pages = Array.isArray(item.pdf_pages) ? item.pdf_pages : [];
-        const pageDurMs = (item.pdf_page_duration_sec || 8) * 1000;
-        const imgs = pages.map((url, i) =>
-            `<img src="${e(url)}" class="sd-pdf-page${i === 0 ? " active" : ""}" alt="Page ${i+1}" />`
-        ).join("");
-        inner = `<div class="sd-pdf-wrapper">${imgs}${pages.length > 1 ? `<div class="sd-pdf-indicator">1 / ${pages.length}</div>` : ""}</div>`;
-        return `<div class="swiper-slide" data-content-type="PDF" data-duration-ms="${durationMs}" data-page-duration-ms="${pageDurMs}"><div class="card sd-card">${inner}</div></div>`;
-    }
-    else if (t === "Clock") {
-        const showDate = item.clock_show_date ? 1 : 0;
-        const tz = item.clock_timezone_label ? `<div class="sd-clock-tz">${e(item.clock_timezone_label)}</div>` : "";
-        inner = `<div class="sd-clock-wrapper" data-format="${e(item.clock_format || '24 Hour')}" data-show-date="${showDate}">
-                    ${item.content_name ? `<div class="sd-clock-label">${e(item.content_name)}</div>` : ""}
-                    <div class="sd-clock-time">--:--</div>
-                    <div class="sd-clock-date"></div>
-                    ${tz}</div>`;
-    }
-    else {
-        inner = `<div class="sd-no-playlist" style="position:absolute;inset:0;">Unknown content type: ${e(t)}</div>`;
-    }
-
-    const ytAttr = ["YouTube", "Webpage", "URL Redirect"].includes(t)
-        ? `data-duration-ms="${durationMs}"` : "";
-
-    return `<div class="swiper-slide" data-content-type="${e(t)}" data-duration-ms="${durationMs}" ${ytAttr}>
-              <div class="card sd-card">${inner}</div>
-            </div>`;
+function formatTime(totalSeconds) {
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-function buildNoPlaylistSlide() {
-    return `<div class="swiper-slide"><div class="sd-no-playlist">Please check playlist configuration.</div></div>`;
+// ── YouTube audio: unmute all iframes via postMessage ────────────────────────
+// Browsers block autoplay-with-audio until first user gesture.
+// We send unMute + playVideo commands to every YouTube iframe on first click.
+let _userInteracted = false;
+
+function unmuteAllYouTubeIframes() {
+    if (_userInteracted) return;
+    _userInteracted = true;
+
+    // Hide the "tap for audio" hint
+    const hint = document.getElementById("sd-audio-hint");
+    if (hint) { hint.classList.add("hide"); setTimeout(() => hint.remove(), 700); }
+    document.querySelectorAll("iframe.sd-youtube").forEach(iframe => {
+        try {
+            iframe.contentWindow.postMessage(
+                JSON.stringify({ event: "command", func: "unMute", args: [] }),
+                "*"
+            );
+            iframe.contentWindow.postMessage(
+                JSON.stringify({ event: "command", func: "setVolume", args: [100] }),
+                "*"
+            );
+        } catch(e) {}
+    });
 }
 
-// ── API ───────────────────────────────────────────────────────────────────────
-async function fetchContent() {
-    if (!SCREEN_ID) return null;
+// Listen for any user interaction to unmute
+["click", "touchstart", "keydown"].forEach(evt => {
+    document.addEventListener(evt, unmuteAllYouTubeIframes, { once: false, passive: true });
+});
+
+function goNext() {
+    if (!swiper) return;
+    const isLast = swiper.activeIndex >= swiper.slides.length - 1;
+    isLast ? swiper.slideTo(0, 800) : swiper.slideNext(800);
+    swiper.autoplay.start();
+}
+
+// ── API helpers ───────────────────────────────────────────────────────────────
+async function fetchSignages() {
     try {
-        const res = await fetch(`${API_CONTENT}?screen_id=${encodeURIComponent(SCREEN_ID)}`, {
-            headers: { Accept: "application/json" },
-        });
+        const url = SCREEN_ID
+            ? `${API_SCREEN}?screen_id=${encodeURIComponent(SCREEN_ID)}`
+            : API_ALL;
+        const headers = { Accept: "application/json" };
+        if (SD.csrfToken) headers["X-Frappe-CSRF-Token"] = SD.csrfToken;
+        const res = await fetch(url, { headers });
         if (!res.ok) return null;
         const data = await res.json();
-        return data.message || null;
+        return data.message || [];
     } catch { return null; }
 }
 
 async function sendHeartbeat() {
     if (!SCREEN_ID) return;
     try {
+        // Guest-allowed endpoint — GET with query param avoids CSRF entirely.
         await fetch(`${API_HB}?screen_id=${encodeURIComponent(SCREEN_ID)}`, {
+            method: "GET",
             headers: { Accept: "application/json" },
         });
     } catch {}
 }
 
-// ── Refresh Cycle ─────────────────────────────────────────────────────────────
-async function refreshContent() {
-    const response = await fetchContent();
-    if (!response) return;
+// ── Slide builder ─────────────────────────────────────────────────────────────
+function buildSlide(s) {
+    const type       = (s.content_type || "Image");
+    const durationMs = s.display_duration
+        ? s.display_duration * 1000
+        : (SD.displayDuration || 20000);
 
-    const json = JSON.stringify(response);
+    const titleHtml = s.show_title ? `<h1 class="card-title">${esc(s.title)}</h1>` : "";
+    const descHtml  = s.description ? `<p class="card-text">${s.description}</p>` : "";
+
+    let inner = "";
+
+    if (type === "Image") {
+        inner = s.display_image
+            ? `<img src="${esc(s.display_image)}" class="sd-img" alt="${esc(s.title)}" />
+               <div class="card-img-overlay">${titleHtml}${descHtml}</div>`
+            : `<div class="card-body">${titleHtml}${descHtml}</div>`;
+
+    } else if (type === "Video") {
+        inner = `<video class="sd-video" src="${esc(s.video_file)}" playsinline data-slide-video="1"></video>
+                 ${(titleHtml || descHtml) ? `<div class="card-img-overlay">${titleHtml}${descHtml}</div>` : ""}`;
+
+    } else if (type === "YouTube") {
+        // Progress bar + countdown label overlay at the bottom
+        const countdownSecs = Math.round(durationMs / 1000);
+        inner = `
+            <iframe class="sd-youtube"
+                src="${esc(s.youtube_embed_url)}"
+                allow="autoplay; encrypted-media; fullscreen"
+                allowfullscreen frameborder="0"></iframe>
+            <div class="sd-yt-bar-wrapper">
+                <div class="sd-yt-bar-track">
+                    <div class="sd-yt-progress-bar"></div>
+                </div>
+                <span class="sd-yt-countdown">${formatTime(countdownSecs)}</span>
+            </div>`;
+
+    } else if (type === "Webpage") {
+        // Fullscreen iframe of an external URL. Same timer-based advancement as YouTube
+        // (we can't detect "end" of an arbitrary webpage), with the same progress bar UX.
+        const countdownSecs = Math.round(durationMs / 1000);
+        inner = `
+            <iframe class="sd-webpage"
+                src="${esc(s.webpage_url)}"
+                allow="autoplay; encrypted-media; fullscreen"
+                allowfullscreen frameborder="0" scrolling="no"></iframe>
+            <div class="sd-yt-bar-wrapper">
+                <div class="sd-yt-bar-track">
+                    <div class="sd-yt-progress-bar"></div>
+                </div>
+                <span class="sd-yt-countdown">${formatTime(countdownSecs)}</span>
+            </div>`;
+
+    } else {
+        // Text Only — always show title, description is raw HTML from Text Editor
+        const txtTitle = s.title ? `<h1 class="card-title">${esc(s.title)}</h1>` : "";
+        const txtDesc  = s.description ? `<div class="card-text">${s.description}</div>` : "";
+        inner = `<div class="sd-text-only">${txtTitle}${txtDesc}</div>`;
+    }
+
+    // Store timer duration on the slide for YouTube AND Webpage (both use the timer-based advance)
+    const timedAttr = (type === "YouTube" || type === "Webpage")
+        ? `data-yt-duration="${durationMs}"` : "";
+
+    return `<div class="swiper-slide" data-swiper-autoplay="${durationMs}" data-content-type="${esc(type)}" ${timedAttr}>
+              <div class="card sd-card">${inner}</div>
+            </div>`;
+}
+
+function buildEmptySlide() {
+    return `<div class="swiper-slide" data-content-type="Image">
+              <div class="card sd-card">
+                <div class="card-body" style="color:#888;font-size:1.5rem;">
+                  No published signages yet.
+                </div>
+              </div>
+            </div>`;
+}
+
+// ── Refresh cycle ─────────────────────────────────────────────────────────────
+async function refreshSignages() {
+    const signages = await fetchSignages();
+    if (!signages) return;
+
+    const json = JSON.stringify(signages);
     if (json === _lastJson) return;
     _lastJson = json;
 
     const prev = swiper ? swiper.activeIndex : 0;
-    clearTimers();
+    clearYouTubeTimer();
     swiper.autoplay.stop();
     swiper.removeAllSlides();
 
-    const items = response.items || [];
-    if (items.length === 0 || response.error === "no_playlist") {
-        swiper.appendSlide(buildNoPlaylistSlide());
-    } else {
-        items.forEach(item => swiper.appendSlide(buildSlide(item)));
-    }
+    signages.length === 0
+        ? swiper.appendSlide(buildEmptySlide())
+        : signages.forEach(s => swiper.appendSlide(buildSlide(s)));
 
     swiper.update();
     swiper.slideTo(Math.min(prev, swiper.slides.length - 1), 0);
@@ -341,10 +372,10 @@ async function refreshContent() {
     handleActiveSlide();
 }
 
-function startPolling()   { refreshContent(); setInterval(refreshContent, POLL_MS); }
-function startHeartbeat() { sendHeartbeat();  setInterval(sendHeartbeat,  HEARTBEAT_MS); }
+function startPolling()   { refreshSignages(); setInterval(refreshSignages, POLL_INTERVAL_MS); }
+function startHeartbeat() { sendHeartbeat();   setInterval(sendHeartbeat, HEARTBEAT_MS); }
 
-function e(str) {
+function esc(str) {
     if (!str) return "";
-    return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
