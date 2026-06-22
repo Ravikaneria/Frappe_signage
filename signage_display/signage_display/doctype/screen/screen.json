@@ -1,12 +1,6 @@
 {
- "actions": [],
- "allow_rename": 0,
- "autoname": "naming_series:",
- "creation": "2026-06-16 00:00:00.000000",
  "default_view": "List",
  "doctype": "DocType",
- "editable_grid": 1,
- "engine": "InnoDB",
  "field_order": [
   "screen_id",
   "screen_name",
@@ -16,11 +10,12 @@
   "last_seen",
   "sec_url",
   "display_url",
-  "sec_signage",
-  "show_all_signages",
-  "signages",
-  "sec_notes",
-  "location_notes"
+  "sec_playlist",
+  "default_playlist",
+  "sec_schedule",
+  "schedule",
+  "sec_location",
+  "location"
  ],
  "fields": [
   {
@@ -29,9 +24,9 @@
    "in_list_view": 1,
    "label": "Screen ID",
    "read_only": 1,
-   "unique": 1,
    "bold": 1,
-   "description": "Auto-generated on save. Used in the display URL."
+   "unique": 1,
+   "description": "Auto-generated 5-digit code. Shown on TV app for pairing."
   },
   {
    "fieldname": "screen_name",
@@ -76,47 +71,48 @@
    "fieldtype": "Data",
    "label": "Display URL",
    "read_only": 1,
-   "description": "Open this URL on the TV or display screen."
+   "description": "Open this URL on the display screen or enter the Screen ID in the TV app."
   },
   {
-   "fieldname": "sec_signage",
+   "fieldname": "sec_playlist",
    "fieldtype": "Section Break",
-   "label": "Signage Assignment"
+   "label": "Default Playlist"
   },
   {
-   "default": "1",
-   "fieldname": "show_all_signages",
-   "fieldtype": "Check",
-   "label": "Show All Published Signages",
-   "description": "If checked, this screen shows all published signages. Uncheck to assign specific signages below."
+   "fieldname": "default_playlist",
+   "fieldtype": "Link",
+   "label": "Default Playlist",
+   "options": "Playlist",
+   "description": "Plays when no schedule slot matches the current time. If not set, screen shows 'Please check playlist'."
   },
   {
-   "fieldname": "signages",
+   "fieldname": "sec_schedule",
+   "fieldtype": "Section Break",
+   "label": "Schedule"
+  },
+  {
+   "fieldname": "schedule",
    "fieldtype": "Table",
-   "label": "Assigned Signages",
-   "options": "Screen Signage Item",
-   "depends_on": "eval:!doc.show_all_signages",
-   "description": "Add signages in the order you want them displayed on this screen."
+   "label": "Schedule",
+   "options": "Screen Schedule",
+   "description": "Add time slots. If current time matches a slot, that slot's Playlist plays. If nothing matches, Default Playlist plays."
   },
   {
-   "fieldname": "sec_notes",
+   "fieldname": "sec_location",
    "fieldtype": "Section Break",
-   "label": "Location / Notes"
+   "label": "Location"
   },
   {
-   "fieldname": "location_notes",
+   "fieldname": "location",
    "fieldtype": "Small Text",
-   "label": "Location / Notes"
+   "label": "Location / Notes",
+   "description": "e.g. Reception, Floor 2, Conference Room A"
   }
  ],
  "icon": "fa fa-tv",
- "in_create": 0,
- "links": [],
- "modified": "2026-06-16 00:00:00.000000",
- "modified_by": "Administrator",
+ "modified": "2026-06-22 00:00:00.000000",
  "module": "Signage Display",
  "name": "Screen",
- "owner": "Administrator",
  "permissions": [
   {
    "create": 1,
@@ -131,10 +127,20 @@
    "write": 1
   }
  ],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-06-22 00:00:00.000000",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "in_create": 0,
+ "links": [],
+ "migration_hash": null,
+ "modified_by": "Administrator",
+ "owner": "Administrator",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
  "track_changes": 1,
- "migration_hash": null,
+ "actions": [],
  "naming_series": "SCR-.#####"
 }

@@ -1,0 +1,48 @@
+frappe.ui.form.on("Content", {
+    refresh: function(frm) {
+        frm.trigger("content_type");
+    },
+
+    content_type: function(frm) {
+        const t = frm.doc.content_type || "Image";
+        frm.toggle_display("media_image",         t === "Image");
+        frm.toggle_display("video_file",          t === "Video");
+        frm.toggle_display("youtube_url",         t === "YouTube");
+        frm.toggle_display("youtube_embed_url",   t === "YouTube");
+        frm.toggle_display("webpage_url",         t === "Webpage");
+        frm.toggle_display("redirect_url",        t === "URL Redirect");
+        frm.toggle_display("pdf_file",            t === "PDF");
+        frm.toggle_display("clock_format",        t === "Clock");
+        frm.toggle_display("clock_show_date",     t === "Clock");
+        frm.toggle_display("clock_timezone_label",t === "Clock");
+    },
+
+    youtube_url: function(frm) {
+        const url = frm.doc.youtube_url || "";
+        if (!url) return;
+        const m = url.match(
+            /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/
+        );
+        if (m) {
+            const id = m[1];
+            frm.set_value("youtube_embed_url",
+                `https://www.youtube.com/embed/${id}?autoplay=1&mute=0&loop=1&playlist=${id}&controls=0&modestbranding=1&rel=0&enablejsapi=1`
+            );
+            frappe.show_alert({ message: `YouTube ID: ${id}`, indicator: "green" });
+        } else {
+            frappe.show_alert({ message: "Could not detect YouTube video ID", indicator: "orange" });
+        }
+    },
+
+    media_image: function(frm) {
+        if (frm.doc.media_image) {
+            frappe.show_alert({ message: "Image will be auto-resized to max 1920×1080 on save", indicator: "blue" });
+        }
+    },
+
+    pdf_file: function(frm) {
+        if (frm.doc.pdf_file) {
+            frappe.show_alert({ message: "PDF will be converted to slides on save (each page = one slide)", indicator: "blue" });
+        }
+    },
+});

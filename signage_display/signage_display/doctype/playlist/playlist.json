@@ -1,0 +1,86 @@
+{
+ "default_view": "List",
+ "doctype": "DocType",
+ "field_order": [
+  "playlist_name",
+  "is_published",
+  "col_break_1",
+  "description",
+  "sec_items",
+  "items"
+ ],
+ "fields": [
+  {
+   "fieldname": "playlist_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Playlist Name",
+   "reqd": 1,
+   "unique": 1,
+   "bold": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "is_published",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Published",
+   "description": "Only published playlists will play on screens."
+  },
+  {
+   "fieldname": "col_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description / Notes"
+  },
+  {
+   "fieldname": "sec_items",
+   "fieldtype": "Section Break",
+   "label": "Content Items"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Playlist Item",
+   "description": "Add content in the order it should play. Set duration in seconds for each item."
+  }
+ ],
+ "icon": "fa fa-list",
+ "modified": "2026-06-22 00:00:00.000000",
+ "module": "Signage Display",
+ "name": "Playlist",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-06-22 00:00:00.000000",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "in_create": 0,
+ "links": [],
+ "migration_hash": null,
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "actions": [],
+ "naming_series": "PLY-.#####"
+}
