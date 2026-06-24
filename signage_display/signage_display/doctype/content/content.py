@@ -136,7 +136,7 @@ CONTENT_FIELDS = [
     "content_name", "content_type",
     "media_image", "video_file",
     "youtube_embed_url",
-    "webpage_url", "redirect_url",
+    "webpage_url", "redirect_url", "webpage_zoom",
     "pdf_pages_json",
     "clock_format", "clock_show_date", "clock_timezone_label",
 ]

@@ -46,6 +46,27 @@ video::-webkit-media-controls { display: none !important; }
     border: none; display: block;
 }
 
+/* TV zoom fix — Teamup and other webpages often render too small on TV screens
+   because the TV browser reports a low device pixel ratio.
+   Scaling the iframe UP makes content more legible on large displays.
+   Adjust --webpage-zoom between 1.0 (normal) and 2.0 (2x zoom).
+   Default 1.3 = 30% larger, which matches typical TV viewing distance. */
+.sd-webpage-wrapper {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+}
+
+.sd-webpage-wrapper iframe.sd-webpage {
+    width: calc(100% / var(--webpage-zoom, 1.3));
+    height: calc(100% / var(--webpage-zoom, 1.3));
+    transform: scale(var(--webpage-zoom, 1.3));
+    transform-origin: top left;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
 /* ── Text Only ── */
 .sd-text-only {
     flex: 1 !important; width: 100% !important;
