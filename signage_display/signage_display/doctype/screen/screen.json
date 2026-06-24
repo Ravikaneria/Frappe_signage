@@ -2,6 +2,7 @@
  "default_view": "List",
  "doctype": "DocType",
  "field_order": [
+  "naming_series",
   "screen_id",
   "screen_name",
   "col_break_1",
@@ -18,6 +19,16 @@
   "location"
  ],
  "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "no_copy": 1,
+   "options": "SCR-.#####",
+   "print_hide": 1,
+   "set_only_once": 1,
+   "hidden": 1
+  },
   {
    "fieldname": "screen_id",
    "fieldtype": "Data",

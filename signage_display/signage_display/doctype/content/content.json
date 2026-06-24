@@ -2,6 +2,7 @@
  "default_view": "List",
  "doctype": "DocType",
  "field_order": [
+  "naming_series",
   "content_name",
   "col_break_1",
   "content_type",
@@ -21,6 +22,16 @@
   "notes"
  ],
  "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "no_copy": 1,
+   "options": "CON-.#####",
+   "print_hide": 1,
+   "set_only_once": 1,
+   "hidden": 1
+  },
   {
    "fieldname": "content_name",
    "fieldtype": "Data",

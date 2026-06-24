@@ -2,6 +2,7 @@
  "default_view": "List",
  "doctype": "DocType",
  "field_order": [
+  "naming_series",
   "playlist_name",
   "is_published",
   "col_break_1",
@@ -10,6 +11,16 @@
   "items"
  ],
  "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "no_copy": 1,
+   "options": "PLY-.#####",
+   "print_hide": 1,
+   "set_only_once": 1,
+   "hidden": 1
+  },
   {
    "fieldname": "playlist_name",
    "fieldtype": "Data",

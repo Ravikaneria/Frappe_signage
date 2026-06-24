@@ -96,9 +96,27 @@ function handleUserInteraction() {
 function initSwiper() {
     swiper = new Swiper(".sd-swiper", {
         speed: 1200,
-        autoplay: { delay: GLOBAL_MS, disableOnInteraction: false },
+        autoplay: {
+            delay: GLOBAL_MS,
+            disableOnInteraction: false,
+        },
         pagination: { el: ".swiper-pagination", clickable: true },
         loop: false,
+        on: {
+            // Before each slide transition, update the autoplay delay
+            // to match the current slide's data-swiper-autoplay value.
+            // This is how Swiper v11 reads per-slide duration.
+            autoplayTimeLeft(s, time, progress) {},
+            slideChange: function() {
+                const slide = swiper.slides[swiper.activeIndex];
+                if (slide) {
+                    const ms = parseInt(slide.dataset.swiperAutoplay);
+                    if (ms && ms > 0) {
+                        swiper.params.autoplay.delay = ms;
+                    }
+                }
+            }
+        }
     });
     swiper.on("autoplayStop", () => {
         const slide = swiper.slides[swiper.activeIndex];
@@ -265,7 +283,7 @@ function buildSlide(item) {
             `<img src="${e(url)}" class="sd-pdf-page${i === 0 ? " active" : ""}" alt="Page ${i+1}" />`
         ).join("");
         inner = `<div class="sd-pdf-wrapper">${imgs}${pages.length > 1 ? `<div class="sd-pdf-indicator">1 / ${pages.length}</div>` : ""}</div>`;
-        return `<div class="swiper-slide" data-content-type="PDF" data-duration-ms="${durationMs}" data-page-duration-ms="${pageDurMs}"><div class="card sd-card">${inner}</div></div>`;
+        return `<div class="swiper-slide" data-content-type="PDF" data-duration-ms="${durationMs}" data-swiper-autoplay="${durationMs}" data-page-duration-ms="${pageDurMs}"><div class="card sd-card">${inner}</div></div>`;
     }
     else if (t === "Clock") {
         const showDate = item.clock_show_date ? 1 : 0;
@@ -283,7 +301,7 @@ function buildSlide(item) {
     const ytAttr = ["YouTube", "Webpage", "URL Redirect"].includes(t)
         ? `data-duration-ms="${durationMs}"` : "";
 
-    return `<div class="swiper-slide" data-content-type="${e(t)}" data-duration-ms="${durationMs}" ${ytAttr}>
+    return `<div class="swiper-slide" data-content-type="${e(t)}" data-duration-ms="${durationMs}" data-swiper-autoplay="${durationMs}" ${ytAttr}>
               <div class="card sd-card">${inner}</div>
             </div>`;
 }
@@ -337,6 +355,14 @@ async function refreshContent() {
 
     swiper.update();
     swiper.slideTo(Math.min(prev, swiper.slides.length - 1), 0);
+
+    // Set autoplay delay from the first slide before starting
+    const firstSlide = swiper.slides[swiper.activeIndex];
+    if (firstSlide) {
+        const ms = parseInt(firstSlide.dataset.swiperAutoplay);
+        if (ms && ms > 0) swiper.params.autoplay.delay = ms;
+    }
+
     swiper.autoplay.start();
     handleActiveSlide();
 }
