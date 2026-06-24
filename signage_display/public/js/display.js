@@ -160,14 +160,12 @@ function handleActiveSlide() {
         _ytTimer = setTimeout(() => { clearTimers(); goNext(); }, durationMs);
 
         // Reload Webpage/URL iframes every time they become active.
-        // This ensures date-sensitive pages like Teamup always show today,
-        // not a cached date from when the page first loaded.
+        // This ensures date-sensitive pages like Teamup always show today.
         if (t === "Webpage" || t === "URL Redirect") {
             const iframe = slide.querySelector("iframe.sd-webpage");
             if (iframe) {
-                // Reload with cache-bust to get today's date on date-sensitive pages
-                const baseSrc = iframe.dataset.src || iframe.src.split("?_t=")[0];
-                iframe.src = baseSrc + (baseSrc.includes("?") ? "&" : "?") + "_t=" + Date.now();
+                const baseSrc = iframe.dataset.src || iframe.getAttribute("src").split("?_t=")[0];
+                iframe.setAttribute("src", baseSrc + (baseSrc.includes("?") ? "&" : "?") + "_t=" + Date.now());
             }
         }
 
@@ -284,13 +282,8 @@ function buildSlide(item) {
     }
     else if (t === "Webpage" || t === "URL Redirect") {
         const src = t === "Webpage" ? item.webpage_url : item.redirect_url;
-        // Wrap iframe in zoom wrapper for TV legibility
-        // zoom comes from the Content record's Zoom Level field (default 1.3)
-        const zoom = item.webpage_zoom || 1.3;
         inner = `
-            <div class="sd-webpage-wrapper" style="--webpage-zoom:${zoom}">
-                <iframe class="sd-webpage" src="${e(src)}" data-src="${e(src)}" allow="autoplay; encrypted-media; fullscreen" allowfullscreen frameborder="0" scrolling="no"></iframe>
-            </div>
+            <iframe class="sd-webpage" src="${e(src)}" data-src="${e(src)}" allow="autoplay; encrypted-media; fullscreen" allowfullscreen frameborder="0" scrolling="no"></iframe>
             <div class="sd-yt-bar-wrapper"><div class="sd-yt-bar-track"><div class="sd-yt-progress-bar"></div></div><span class="sd-yt-countdown">${fmt(Math.round(durationMs / 1000))}</span></div>`;
     }
     else if (t === "PDF") {
