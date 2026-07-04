@@ -195,31 +195,38 @@ function handleActiveSlide() {
     else if (t === "PDF") {
         const pages = Array.from(slide.querySelectorAll(".sd-pdf-page"));
         if (pages.length === 0) return;
+
+        // Single page — use normal swiper autoplay, no interval needed
         if (pages.length === 1) {
-            // Single page — use normal Swiper autoplay
+            swiper.autoplay.start();
             return;
         }
 
+        // Multiple pages — stop swiper autoplay, cycle pages manually
         swiper.autoplay.stop();
         const pageDurationMs = parseInt(slide.dataset.pageDurationMs) || 8000;
         const indicator = slide.querySelector(".sd-pdf-indicator");
 
-        // Ensure first page is shown
+        // Reset: show only first page
         pages.forEach((p, i) => p.classList.toggle("active", i === 0));
         if (indicator) indicator.textContent = `1 / ${pages.length}`;
 
         let currentPage = 0;
 
         _pdfTimer = setInterval(() => {
-            // Hide current page
             pages[currentPage].classList.remove("active");
             currentPage++;
 
             if (currentPage >= pages.length) {
-                // All pages shown — stop this timer and advance to next slide
+                // All pages shown — clear timer first, THEN advance
                 clearInterval(_pdfTimer);
                 _pdfTimer = null;
-                goNext();
+                // Use setTimeout(0) to let the interval fully exit before
+                // calling goNext(), preventing any race with Swiper's state
+                setTimeout(() => {
+                    swiper.autoplay.start();  // restart autoplay first
+                    goNext();                 // then advance
+                }, 0);
                 return;
             }
 
@@ -265,7 +272,9 @@ function goNext() {
     if (!swiper) return;
     swiper.activeIndex >= swiper.slides.length - 1
         ? swiper.slideTo(0, 800) : swiper.slideNext(800);
-    swiper.autoplay.start();
+    // Delay autoplay restart until after the 800ms slide transition completes
+    // This prevents Swiper from ignoring the start() call during animation
+    setTimeout(() => swiper.autoplay.start(), 900);
 }
 
 // ── Progress Bar ──────────────────────────────────────────────────────────────
@@ -404,7 +413,11 @@ async function refreshContent() {
     const response = await fetchContent();
     if (!response) return;
 
-    const json = JSON.stringify(response);
+    // Include current minute in cache key so schedule slot changes
+    // (new time window becoming active) always trigger a content refresh
+    const now = new Date();
+    const minuteKey = `${now.getHours()}:${now.getMinutes()}`;
+    const json = JSON.stringify(response) + minuteKey;
     if (json === _lastJson) return;
     _lastJson = json;
 

@@ -146,18 +146,15 @@ def get_content_for_screen(screen_id):
             return {"error": "no_playlist", "items": []}
         active_playlists = [screen.default_playlist]
 
-    # Merge content from all active playlists in order
+    # Merge content from ALL active playlists in order
+    # No deduplication — each playlist plays fully even if they share content
+    # Example: General playlist (08:00-18:00) + Lunch playlist (12:00-13:00)
+    # at 12:30 shows: [General items...] + [Lunch items...]
     merged_items = []
-    seen_content = set()  # avoid duplicate content items across playlists
 
     for playlist_name in active_playlists:
         items = get_playlist_content(playlist_name, site_url)
-        for item in items:
-            # Use content_name as dedup key — same content won't show twice
-            key = item.get("content_name", "")
-            if key not in seen_content:
-                merged_items.append(item)
-                seen_content.add(key)
+        merged_items.extend(items)
 
     return {
         "screen_name": screen.screen_name,
