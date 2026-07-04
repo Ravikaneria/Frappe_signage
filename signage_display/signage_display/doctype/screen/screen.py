@@ -1,19 +1,9 @@
 import random
-import string
 import datetime
 import frappe
 from frappe.model.document import Document
 
 _WEEKDAY_FIELDS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-
-DEFAULT_SCHEDULE_ROW = {
-    "playlist": None,   # filled after default playlist created
-    "start_time": datetime.time(0, 0, 0),
-    "end_time": datetime.time(23, 59, 59),
-    "monday": 1, "tuesday": 1, "wednesday": 1, "thursday": 1,
-    "friday": 1, "saturday": 1, "sunday": 1,
-    "is_active": 1,
-}
 
 
 class Screen(Document):
@@ -29,14 +19,13 @@ class Screen(Document):
     def on_update(self):
         self._refresh_display_url()
 
-    # ── Screen ID: 5 alphanumeric characters (uppercase, no ambiguous chars) ──
     def _generate_screen_id(self):
-        chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O/1/I to avoid confusion
+        chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
         for _ in range(100):
             code = "".join(random.choices(chars, k=5))
             if not frappe.db.exists("Screen", {"screen_id": code}):
                 return code
-        frappe.throw("Could not generate a unique Screen ID. Please try again.")
+        frappe.throw("Could not generate a unique Screen ID.")
 
     def _refresh_display_url(self):
         site_url = frappe.utils.get_url()
@@ -45,49 +34,39 @@ class Screen(Document):
             frappe.db.set_value("Screen", self.name, "display_url", url, update_modified=False)
 
     def _ensure_default_schedule_row(self):
-        """
-        On first creation, add a default 00:00–23:59 all-days row pointing at
-        the Default Playlist. This means if no other schedule matches, the
-        default playlist always plays (fallback to 24/7 coverage).
-        """
         if self.default_playlist:
             doc = frappe.get_doc("Screen", self.name)
             if not doc.schedule:
                 row = doc.append("schedule", {})
-                row.playlist     = self.default_playlist
-                row.start_time   = datetime.time(0, 0, 0)
-                row.end_time     = datetime.time(23, 59, 59)
-                row.monday       = 1
-                row.tuesday      = 1
-                row.wednesday    = 1
-                row.thursday     = 1
-                row.friday       = 1
-                row.saturday     = 1
-                row.sunday       = 1
-                row.is_active    = 1
+                row.playlist   = self.default_playlist
+                row.start_time = datetime.time(0, 0, 0)
+                row.end_time   = datetime.time(23, 59, 59)
+                for day in _WEEKDAY_FIELDS:
+                    setattr(row, day, 1)
+                row.is_active  = 1
                 doc.save(ignore_permissions=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  SCHEDULING ENGINE — which playlist is active right now?
+#  SCHEDULING ENGINE
 # ─────────────────────────────────────────────────────────────────────────────
 
-def get_active_playlist(screen_name, now=None):
+def get_active_playlists(screen_name, now=None):
     """
-    Given a Screen name, return the playlist_name that should be playing
-    right now, or None if nothing matches (caller should use default playlist).
+    Returns a LIST of all playlists whose schedule slots are active right now.
 
-    Matching rules per schedule row (highest-priority = lowest idx wins):
-      1. is_active must be 1
-      2. Current weekday must be checked in the row
-      3. Current time must be within [start_time, end_time]
-         Overnight windows (e.g. 22:00–02:00) are handled correctly.
+    When multiple slots overlap in time (e.g. a "General" playlist running
+    08:00–18:00 and a "Lunch Menu" playlist running 12:00–13:00 both active
+    at 12:30), ALL matching playlists are returned and their content is merged
+    into one combined playlist for the display.
+
+    Returns [] if no slots match (caller uses default playlist).
     """
     if now is None:
         now = frappe.utils.now_datetime()
 
     current_time = now.time()
-    weekday_field = _WEEKDAY_FIELDS[now.weekday()]  # Monday=0 … Sunday=6
+    weekday_field = _WEEKDAY_FIELDS[now.weekday()]
 
     rows = frappe.get_all(
         "Screen Schedule",
@@ -96,14 +75,20 @@ def get_active_playlist(screen_name, now=None):
         order_by="idx asc",
     )
 
+    active_playlists = []
+    seen = set()
+
     for row in rows:
         if not row.get(weekday_field):
             continue
         if not _time_in_window(current_time, row.start_time, row.end_time):
             continue
-        return row.playlist
+        # Avoid duplicate playlists (same playlist in multiple matching slots)
+        if row.playlist and row.playlist not in seen:
+            active_playlists.append(row.playlist)
+            seen.add(row.playlist)
 
-    return None
+    return active_playlists
 
 
 def _to_time(val):
@@ -132,9 +117,11 @@ def _time_in_window(t, start, end):
 @frappe.whitelist(allow_guest=True)
 def get_content_for_screen(screen_id):
     """
-    Main API called by the player every 30 s.
-    Returns the ordered content list for the currently-active playlist on
-    this screen, or an error message if nothing is configured.
+    Returns merged content from all currently-active schedule slots.
+
+    Example: if slot A (General, 08:00-18:00) and slot B (Lunch, 12:00-13:00)
+    both match at 12:30, the response combines content from BOTH playlists:
+    [General item 1, General item 2, Lunch item 1, Lunch item 2, ...]
     """
     screen = frappe.db.get_value(
         "Screen",
@@ -146,28 +133,41 @@ def get_content_for_screen(screen_id):
         return {"error": f"Screen '{screen_id}' not found or inactive.", "items": []}
 
     _record_heartbeat(screen.name)
-
     site_url = frappe.utils.get_url()
 
-    # Determine which playlist is active right now
-    active_playlist = get_active_playlist(screen.name) or screen.default_playlist
-
-    if not active_playlist:
-        return {"error": "no_playlist", "items": []}
-
     from signage_display.signage_display.doctype.playlist.playlist import get_playlist_content
-    items = get_playlist_content(active_playlist, site_url)
+
+    # Get all currently-active playlists (may be multiple if slots overlap)
+    active_playlists = get_active_playlists(screen.name)
+
+    if not active_playlists:
+        # No schedule slot matches — use default playlist
+        if not screen.default_playlist:
+            return {"error": "no_playlist", "items": []}
+        active_playlists = [screen.default_playlist]
+
+    # Merge content from all active playlists in order
+    merged_items = []
+    seen_content = set()  # avoid duplicate content items across playlists
+
+    for playlist_name in active_playlists:
+        items = get_playlist_content(playlist_name, site_url)
+        for item in items:
+            # Use content_name as dedup key — same content won't show twice
+            key = item.get("content_name", "")
+            if key not in seen_content:
+                merged_items.append(item)
+                seen_content.add(key)
 
     return {
         "screen_name": screen.screen_name,
-        "active_playlist": active_playlist,
-        "items": items,
+        "active_playlists": active_playlists,
+        "items": merged_items,
     }
 
 
 @frappe.whitelist(allow_guest=True)
 def screen_heartbeat(screen_id):
-    """Called every 30 s by the player to mark the screen as Live Now."""
     name = frappe.db.get_value("Screen", {"screen_id": screen_id}, "name")
     if name:
         _record_heartbeat(name)
@@ -184,10 +184,10 @@ def _record_heartbeat(screen_name):
 
 
 def mark_screens_offline():
-    """Scheduler: runs every minute. Marks screens offline after 90 s no heartbeat."""
     cutoff = frappe.utils.add_to_date(frappe.utils.now_datetime(), seconds=-90)
     frappe.db.sql(
-        "UPDATE `tabScreen` SET is_live=0 WHERE is_live=1 AND (last_seen IS NULL OR last_seen < %s)",
+        "UPDATE `tabScreen` SET is_live=0 WHERE is_live=1 "
+        "AND (last_seen IS NULL OR last_seen < %s)",
         (cutoff,),
     )
     frappe.db.commit()
@@ -195,12 +195,11 @@ def mark_screens_offline():
 
 @frappe.whitelist()
 def generate_screens(count=10, default_playlist=None):
-    """Bulk-create Screen records. Called from the Screen List button."""
     count = min(int(count), 50)
     created = []
     for _ in range(count):
         doc = frappe.new_doc("Screen")
-        doc.screen_name = f"Screen {doc.screen_id if hasattr(doc, 'screen_id') else ''}"
+        doc.screen_name = "New Screen"
         doc.is_active = 1
         if default_playlist:
             doc.default_playlist = default_playlist
