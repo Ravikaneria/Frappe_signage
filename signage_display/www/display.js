@@ -1,3 +1,9 @@
+(function() {
+// Signage Display Player v3 — wrapped in IIFE to prevent duplicate declaration errors
+// when Frappe's template engine loads this script more than once.
+if (window._signageV3Loaded) return;
+window._signageV3Loaded = true;
+
 /**
  * display.js — Signage Display Player v3
  * Complete rewrite: no Swiper timing, custom engine, no transitions
@@ -235,16 +241,32 @@ function showNoPlaylist() {
 }
 
 async function fetchContent() {
-    if (!SCREEN_ID) return null;
+    if (!SCREEN_ID) {
+        showError("No Screen ID in URL. Check your display URL.");
+        return null;
+    }
     try {
         const res = await fetch(
             `${API_CONTENT}?screen_id=${encodeURIComponent(SCREEN_ID)}`,
             { headers: { Accept: "application/json" } }
         );
-        if (!res.ok) return null;
+        if (!res.ok) {
+            showError(`API error ${res.status}. Check server logs.`);
+            return null;
+        }
         const data = await res.json();
         return data.message || null;
-    } catch { return null; }
+    } catch (err) {
+        showError("Network error — retrying...");
+        return null;
+    }
+}
+
+function showError(msg) {
+    const container = getContainer();
+    if (container) {
+        container.innerHTML = `<div class="sd-no-playlist">${msg}</div>`;
+    }
 }
 
 async function sendHeartbeat() {
@@ -284,3 +306,6 @@ function e(str) {
     if (!str) return "";
     return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
+
+
+})();
