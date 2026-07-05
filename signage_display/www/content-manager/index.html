@@ -527,21 +527,14 @@ async function handleFileUpload(files) {
             if (file.type.startsWith("video/")) content_type = "Video";
             else if (file.type === "application/pdf") content_type = "PDF";
 
-            // 3. Create Content DocType record
-            const name = file.name.replace(/\.[^.]+$/, "").substring(0, 40)
-                + "_" + Date.now().toString(36);
-
-            const docData = {
-                content_name: name,
-                content_type: content_type,
-            };
-            if (content_type === "Image") docData.media_image = fileUrl;
-            else if (content_type === "Video") docData.video_file = fileUrl;
-            else if (content_type === "PDF") docData.pdf_file = fileUrl;
-
+            // 3. Create Content record via our API (auto-generates name)
             await frappe.call({
-                method: "frappe.client.insert",
-                args: { doc: { doctype: "Content", ...docData } }
+                method: "signage_display.signage_display.doctype.content.content.create_content_from_upload",
+                args: {
+                    file_url: fileUrl,
+                    content_type: content_type,
+                    content_name: ""   // blank = auto-generate from filename
+                }
             });
 
         } catch(err) {
