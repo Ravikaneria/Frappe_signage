@@ -8,6 +8,7 @@ app_version = "2.0.0"
 
 website_route_rules = [
     {"from_route": "/display/<path:screen_id>", "to_route": "display"},
+    {"from_route": "/content-manager", "to_route": "content-manager/index"},
 ]
 
 scheduler_events = {
@@ -16,9 +17,5 @@ scheduler_events = {
     ]
 }
 
-# Runs once when app is installed — sets up DocType permissions in the database.
-# This is the most reliable fix for "New button missing" on Frappe Cloud.
 after_install = "signage_display.install.install.after_install"
-
-# Also run after every migrate to keep permissions in sync
 after_migrate = "signage_display.install.install.after_install"
