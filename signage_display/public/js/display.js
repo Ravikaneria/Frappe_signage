@@ -290,13 +290,21 @@ async function refreshContent() {
     }
     const newSlides = buildSlideList(items);
     if (newSlides.length === 0) { showNoPlaylist(); return; }
+
+    const isFirstLoad = _slides.length === 0;
     const prevIndex = _currentIndex;
     _slides = newSlides;
-    if (prevIndex >= _slides.length) {
+
+    if (isFirstLoad) {
+        // First time — always start from slide 0
+        showSlide(0);
+    } else if (prevIndex >= _slides.length) {
+        // Playlist changed and current index is out of bounds — restart
         if (_slideTimer) { clearTimeout(_slideTimer); _slideTimer = null; }
         if (_clockInterval) { clearInterval(_clockInterval); _clockInterval = null; }
         showSlide(0);
     }
+    // Otherwise current slide finishes naturally then picks up new list
 }
 
 function startPolling()   { refreshContent(); setInterval(refreshContent, POLL_MS); }
