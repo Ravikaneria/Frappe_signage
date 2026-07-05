@@ -94,7 +94,8 @@ function buildSlideList(items) {
                 contentName: item.content_name,
             }));
         } else if (t === "Clock") {
-            slides.push({ type: "Clock", item, durMs: 24*60*60*1000 });
+            // Use the duration set in the Playlist Item (default 30 seconds)
+            slides.push({ type: "Clock", item, durMs });
         } else {
             slides.push({ type: t, item, durMs });
         }
@@ -214,7 +215,6 @@ function showSlide(index) {
 
 function scheduleNext(slide) {
     if (_slideTimer) { clearTimeout(_slideTimer); _slideTimer = null; }
-    if (slide.type === "Clock") return; // clock never auto-advances
     if (slide.type === "Video") {
         const container = getContainer();
         const video = container ? container.querySelector("video") : null;
