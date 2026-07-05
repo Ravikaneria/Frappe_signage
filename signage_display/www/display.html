@@ -1,26 +1,27 @@
 {% extends "templates/web.html" %}
-
 {% block title %}{{ screen_title or "Signage Display" }}{% endblock %}
 
 {% block head_include %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
-<link rel="stylesheet" href="/assets/signage_display/css/display.css?v=3" />
+<link rel="stylesheet" href="/assets/signage_display/css/display.css?v=4" />
 <style>
-/* Inline critical styles — load even if external CSS is cached/404 */
 html,body{margin:0;padding:0;overflow:hidden;background:#000;width:100vw;height:100vh;}
 .page_content,.container,.container-fluid,.row,main{max-width:100vw!important;width:100vw!important;height:100vh!important;padding:0!important;margin:0!important;}
 header,footer,nav,.navbar,.page-header,.breadcrumb-container,.web-footer,#navbar-main{display:none!important;}
 .sd-wrapper{position:fixed;inset:0;width:100vw;height:100vh;background:#000;z-index:9999;}
-.sd-swiper,.swiper-wrapper{width:100vw!important;height:100vh!important;}
-.swiper-slide{width:100vw!important;height:100vh!important;overflow:hidden;position:relative;background:#000;}
-.sd-card{position:absolute;inset:0;width:100%;height:100%;border-radius:0;box-shadow:none;overflow:hidden;background:#000;display:flex;flex-direction:column;}
+.sd-slide-container{position:absolute;inset:0;width:100%;height:100%;}
+.sd-slide-inner{position:absolute;inset:0;width:100%;height:100%;}
 .sd-img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;}
-.sd-video{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:contain!important;background:#000;display:block!important;visibility:visible!important;}
+.sd-video{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:contain!important;background:#000;display:block!important;}
 .sd-youtube,.sd-webpage{position:absolute;inset:0;width:100%;height:100%;border:none;display:block;}
-.sd-text-only{flex:1!important;width:100%!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;text-align:center!important;background:#1a1a2e!important;color:#fff!important;padding:4rem!important;}
+.sd-no-playlist{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#111;color:#888;font-size:1.5rem;font-family:sans-serif;}
 .sd-clock-wrapper{position:absolute!important;inset:0!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;background:#0a0a1a!important;color:#fff!important;}
 .sd-clock-time{font-size:clamp(4rem,15vw,14rem);font-weight:700;font-variant-numeric:tabular-nums;}
-.sd-no-playlist{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#111;color:#888;font-size:1.5rem;font-family:sans-serif;}
+.sd-clock-date{font-size:clamp(1.2rem,3vw,2.5rem);color:#aabbdd;margin-top:1rem;}
+.sd-clock-label{font-size:clamp(1.5rem,3vw,2.5rem);margin-bottom:1.5rem;font-weight:600;}
+.sd-clock-tz{font-size:clamp(1rem,1.5vw,1.5rem);color:#7788aa;margin-top:0.5rem;text-transform:uppercase;}
+.sd-pdf-indicator{position:absolute;bottom:14px;right:18px;background:rgba(0,0,0,0.6);color:#fff;font-size:14px;padding:6px 14px;border-radius:16px;z-index:10;}
+#sd-audio-hint{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.72);color:#fff;font-size:15px;padding:10px 22px;border-radius:30px;z-index:99999;pointer-events:none;opacity:1;transition:opacity 0.6s ease;white-space:nowrap;}
+#sd-audio-hint.hide{opacity:0;}
 </style>
 {% endblock %}
 
@@ -28,21 +29,15 @@ header,footer,nav,.navbar,.page-header,.breadcrumb-container,.web-footer,#navbar
 {% block navbar %}{% endblock %}
 
 {% block page_content %}
-
 {% if error_message %}
 <div class="sd-no-playlist"><p>{{ error_message }}</p></div>
 {% else %}
-
 <div class="sd-wrapper">
-  <div class="swiper sd-swiper">
-    <div class="swiper-wrapper"></div>
-    <div class="swiper-pagination"></div>
-  </div>
+    <div class="sd-slide-container">
+        <div class="sd-no-playlist">Loading...</div>
+    </div>
 </div>
-
-<!-- Audio hint: fades out after first user interaction -->
 <div id="sd-audio-hint">🔊 Tap anywhere to enable audio</div>
-
 {% endif %}
 
 <script>
@@ -52,8 +47,5 @@ window._sd = {
     csrfToken:      "{{ csrf_token }}"
 };
 </script>
-
-<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
-<script src="/assets/signage_display/js/display.js?v=3"></script>
-
+<script src="/assets/signage_display/js/display.js?v=4"></script>
 {% endblock %}
