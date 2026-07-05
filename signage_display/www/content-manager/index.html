@@ -1,291 +1,68 @@
 {% extends "templates/web.html" %}
-{% block title %}Content Manager — Signage Display{% endblock %}
+{% block title %}Content Manager{% endblock %}
 
 {% block head_include %}
 <style>
-:root {
-    --accent: #4CAF50;
-    --accent-dark: #388E3C;
-    --danger: #e53935;
-    --bg: #f5f6fa;
-    --card-bg: #fff;
-    --border: #e0e0e0;
-    --text: #222;
-    --muted: #888;
-}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#f5f6fa;font-family:'Segoe UI',sans-serif;color:#222;}
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+.cm-topbar{background:#fff;border-bottom:1px solid #e0e0e0;padding:14px 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+.cm-topbar h1{font-size:20px;font-weight:700;margin-right:auto;}
+.btn{padding:8px 16px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:5px;}
+.btn-primary{background:#4CAF50;color:#fff;}
+.btn-primary:hover{background:#388E3C;}
+.btn-outline{background:#fff;color:#333;border:1.5px solid #ddd;}
+.btn-outline:hover{background:#f5f5f5;}
+.btn-danger{background:#e53935;color:#fff;}
+.btn-danger:hover{background:#c62828;}
+.btn:disabled{opacity:0.45;cursor:not-allowed;}
 
-body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; }
+.cm-stats{padding:10px 24px;font-size:13px;color:#888;display:flex;align-items:center;gap:8px;}
+.cm-stats b{color:#222;}
 
-/* ── Top Bar ── */
-.cm-topbar {
-    background: #fff;
-    border-bottom: 1px solid var(--border);
-    padding: 14px 24px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-}
+.cm-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:14px;padding:14px 24px 80px;}
 
-.cm-topbar h1 {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--text);
-    margin-right: auto;
-}
+.cm-card{background:#fff;border-radius:10px;border:2.5px solid transparent;box-shadow:0 1px 4px rgba(0,0,0,0.07);overflow:hidden;cursor:pointer;position:relative;}
+.cm-card:hover{box-shadow:0 4px 14px rgba(0,0,0,0.12);}
+.cm-card.selected{border-color:#4CAF50;box-shadow:0 0 0 3px rgba(76,175,80,0.18);}
 
-.btn {
-    padding: 8px 18px;
-    border-radius: 6px;
-    border: none;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 600;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    transition: background 0.15s;
-}
-.btn-primary   { background: var(--accent);  color: #fff; }
-.btn-primary:hover { background: var(--accent-dark); }
-.btn-outline   { background: #fff; color: var(--text); border: 1.5px solid var(--border); }
-.btn-outline:hover { background: #f0f0f0; }
-.btn-danger    { background: var(--danger); color: #fff; }
-.btn-danger:hover { background: #c62828; }
-.btn:disabled  { opacity: 0.5; cursor: not-allowed; }
+.cm-check{position:absolute;top:8px;left:8px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,0.4);border:2px solid rgba(255,255,255,0.8);z-index:2;display:flex;align-items:center;justify-content:center;}
+.cm-card.selected .cm-check{background:#4CAF50;border-color:#4CAF50;}
+.cm-check-icon{display:none;color:#fff;font-size:12px;font-weight:700;}
+.cm-card.selected .cm-check-icon{display:block;}
 
-/* ── Stats bar ── */
-.cm-stats {
-    padding: 10px 24px;
-    font-size: 13px;
-    color: var(--muted);
-    display: flex;
-    align-items: center;
-    gap: 16px;
-}
-.cm-stats span { font-weight: 600; color: var(--text); }
+.cm-badge{position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.5);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;text-transform:uppercase;letter-spacing:0.5px;z-index:2;}
 
-/* ── Gallery Grid ── */
-.cm-gallery {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 16px;
-    padding: 16px 24px 32px;
-}
+.cm-thumb{width:100%;height:140px;background:#1a1a2a;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.cm-thumb img{width:100%;height:100%;object-fit:cover;}
+.cm-thumb-icon{font-size:44px;opacity:0.7;}
 
-/* ── Content Card ── */
-.cm-card {
-    background: var(--card-bg);
-    border-radius: 10px;
-    border: 2px solid transparent;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-    overflow: hidden;
-    cursor: pointer;
-    position: relative;
-    transition: border-color 0.15s, box-shadow 0.15s;
-}
-.cm-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.13); }
-.cm-card.selected {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(76,175,80,0.2);
-}
+.cm-info{padding:9px 10px 11px;}
+.cm-info-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cm-info-type{font-size:11px;color:#999;margin-top:2px;}
 
-/* Checkbox */
-.cm-card .cm-check {
-    position: absolute;
-    top: 8px; left: 8px;
-    width: 22px; height: 22px;
-    border-radius: 50%;
-    background: rgba(0,0,0,0.45);
-    border: 2px solid rgba(255,255,255,0.8);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 2;
-    transition: background 0.15s;
-}
-.cm-card.selected .cm-check {
-    background: var(--accent);
-    border-color: var(--accent);
-}
-.cm-card .cm-check::after {
-    content: '';
-    width: 10px; height: 6px;
-    border-left: 2px solid #fff;
-    border-bottom: 2px solid #fff;
-    transform: rotate(-45deg) translate(1px, -1px);
-    opacity: 0;
-}
-.cm-card.selected .cm-check::after { opacity: 1; }
+.cm-dropzone{border:2px dashed #ccc;border-radius:10px;padding:36px 20px;text-align:center;color:#aaa;cursor:pointer;grid-column:1/-1;transition:all 0.2s;}
+.cm-dropzone:hover,.cm-dropzone.over{border-color:#4CAF50;background:rgba(76,175,80,0.04);color:#4CAF50;}
+.cm-dropzone p{margin-top:8px;font-size:13px;}
 
-/* Type badge */
-.cm-type-badge {
-    position: absolute;
-    top: 8px; right: 8px;
-    background: rgba(0,0,0,0.55);
-    color: #fff;
-    font-size: 10px;
-    font-weight: 700;
-    padding: 2px 7px;
-    border-radius: 20px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    z-index: 2;
-}
+.cm-empty{grid-column:1/-1;text-align:center;padding:70px 20px;color:#bbb;}
+.cm-empty-icon{font-size:56px;}
+.cm-empty p{margin-top:10px;font-size:15px;}
 
-/* Preview area */
-.cm-preview {
-    width: 100%;
-    height: 140px;
-    background: #1a1a1a;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    position: relative;
-}
-.cm-preview img {
-    width: 100%; height: 100%;
-    object-fit: cover;
-}
-.cm-preview .cm-preview-icon {
-    font-size: 40px;
-    opacity: 0.6;
-}
-.cm-preview-youtube { background: #ff0000; }
-.cm-preview-video   { background: #1a1a3a; }
-.cm-preview-pdf     { background: #b71c1c; }
-.cm-preview-clock   { background: #0a0a1a; }
-.cm-preview-webpage { background: #0d47a1; }
+.cm-bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:11px 20px;border-radius:40px;display:none;align-items:center;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,0.3);z-index:200;font-size:13px;}
+.cm-bar.show{display:flex;}
 
-/* Card info */
-.cm-card-info {
-    padding: 10px 10px 12px;
-}
-.cm-card-name {
-    font-size: 13px;
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    color: var(--text);
-}
-.cm-card-meta {
-    font-size: 11px;
-    color: var(--muted);
-    margin-top: 3px;
-}
+.cm-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:300;display:none;align-items:center;justify-content:center;}
+.cm-modal-bg.open{display:flex;}
+.cm-modal{background:#fff;border-radius:12px;padding:26px;width:420px;max-width:95vw;}
+.cm-modal h2{font-size:17px;margin-bottom:14px;}
+.cm-modal select,.cm-modal input[type=number]{width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;margin-bottom:12px;}
+.cm-modal-btns{display:flex;gap:8px;justify-content:flex-end;}
 
-/* ── Empty State ── */
-.cm-empty {
-    grid-column: 1 / -1;
-    text-align: center;
-    padding: 80px 20px;
-    color: var(--muted);
-}
-.cm-empty .cm-empty-icon { font-size: 60px; opacity: 0.3; }
-.cm-empty p { margin-top: 12px; font-size: 16px; }
-
-/* ── Upload Drop Zone ── */
-.cm-dropzone {
-    border: 2px dashed var(--border);
-    border-radius: 10px;
-    padding: 40px;
-    text-align: center;
-    color: var(--muted);
-    cursor: pointer;
-    grid-column: 1 / -1;
-    transition: border-color 0.2s, background 0.2s;
-}
-.cm-dropzone:hover, .cm-dropzone.drag-over {
-    border-color: var(--accent);
-    background: rgba(76,175,80,0.05);
-    color: var(--accent);
-}
-.cm-dropzone p { margin-top: 8px; font-size: 14px; }
-
-/* ── Selection Toolbar ── */
-.cm-selection-bar {
-    position: fixed;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #222;
-    color: #fff;
-    padding: 12px 20px;
-    border-radius: 40px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    z-index: 200;
-    font-size: 14px;
-    display: none;
-}
-.cm-selection-bar.visible { display: flex; }
-
-/* ── Loading ── */
-.cm-loading {
-    grid-column: 1 / -1;
-    text-align: center;
-    padding: 60px;
-    color: var(--muted);
-    font-size: 15px;
-}
-
-/* ── Modal ── */
-.cm-modal-overlay {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.6);
-    z-index: 300;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    display: none;
-}
-.cm-modal-overlay.open { display: flex; }
-.cm-modal {
-    background: #fff;
-    border-radius: 12px;
-    padding: 28px;
-    width: 440px;
-    max-width: 95vw;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-}
-.cm-modal h2 { font-size: 18px; margin-bottom: 16px; }
-.cm-modal select {
-    width: 100%;
-    padding: 10px 14px;
-    border: 1.5px solid var(--border);
-    border-radius: 6px;
-    font-size: 14px;
-    margin-bottom: 16px;
-}
-.cm-modal .cm-modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
-
-/* Progress bar for upload */
-.cm-upload-progress {
-    display: none;
-    margin: 8px 0;
-}
-.cm-upload-progress.visible { display: block; }
-.cm-progress-bar {
-    height: 6px;
-    background: #e0e0e0;
-    border-radius: 3px;
-    overflow: hidden;
-    margin-top: 4px;
-}
-.cm-progress-fill {
-    height: 100%;
-    background: var(--accent);
-    border-radius: 3px;
-    width: 0%;
-    transition: width 0.2s;
-}
+.cm-upload-bar{background:#fff;border-top:1px solid #eee;padding:8px 24px;font-size:13px;color:#555;display:none;}
+.cm-upload-bar.show{display:block;}
+.cm-prog-track{height:5px;background:#eee;border-radius:3px;margin-top:5px;overflow:hidden;}
+.cm-prog-fill{height:100%;background:#4CAF50;border-radius:3px;width:0%;transition:width 0.2s;}
 </style>
 {% endblock %}
 
@@ -293,390 +70,290 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-
 {% block navbar %}{% endblock %}
 
 {% block page_content %}
-
-<!-- Top Bar -->
 <div class="cm-topbar">
     <h1>📁 Content Manager</h1>
-    <button class="btn btn-outline" onclick="window.location.href='/app/content'">ERPNext View</button>
-    <button class="btn btn-outline" id="btn-select-all">Select All</button>
-    <button class="btn btn-danger" id="btn-delete" disabled>🗑 Delete</button>
-    <button class="btn btn-outline" id="btn-add-playlist" disabled>+ Add to Playlist</button>
-    <label class="btn btn-primary" for="file-input">⬆ Upload Content</label>
-    <input type="file" id="file-input" multiple accept="image/*,video/*,.pdf"
-           style="display:none" onchange="handleFileUpload(this.files)" />
+    <button class="btn btn-outline" onclick="location.href='/app/content'">ERPNext View</button>
+    <button class="btn btn-outline" id="btnSelAll">Select All</button>
+    <button class="btn btn-danger" id="btnDel" disabled onclick="deleteSelected()">🗑 Delete</button>
+    <button class="btn btn-outline" id="btnPlaylist" disabled onclick="openModal()">＋ Add to Playlist</button>
+    <label class="btn btn-primary" for="fileInput">⬆ Upload Content</label>
+    <input type="file" id="fileInput" multiple accept="image/*,video/*,.pdf" style="display:none" />
 </div>
 
-<!-- Stats -->
+<div id="uploadBar" class="cm-upload-bar">
+    <span id="uploadStatus">Uploading...</span>
+    <div class="cm-prog-track"><div class="cm-prog-fill" id="progFill"></div></div>
+</div>
+
 <div class="cm-stats">
-    <span id="total-count">0</span> items &nbsp;·&nbsp;
-    <span id="selected-count">0</span> selected
-    <div id="upload-progress" class="cm-upload-progress">
-        Uploading... <span id="upload-status"></span>
-        <div class="cm-progress-bar"><div class="cm-progress-fill" id="progress-fill"></div></div>
-    </div>
+    <b id="totalCount">0</b> items &nbsp;·&nbsp; <b id="selCount">0</b> selected
 </div>
 
-<!-- Gallery -->
 <div class="cm-gallery" id="gallery">
-    <div class="cm-loading">Loading content...</div>
+    <div class="cm-empty"><div class="cm-empty-icon">⏳</div><p>Loading...</p></div>
 </div>
 
-<!-- Selection Bar (floating) -->
-<div class="cm-selection-bar" id="selection-bar">
-    <span id="sel-count-label">0 selected</span>
-    <button class="btn btn-primary" onclick="openAddToPlaylistModal()">+ Add to Playlist</button>
+<div class="cm-bar" id="selBar">
+    <span id="barCount">0 selected</span>
+    <button class="btn btn-primary" onclick="openModal()">＋ Add to Playlist</button>
     <button class="btn btn-danger" onclick="deleteSelected()">🗑 Delete</button>
-    <button class="btn btn-outline" style="color:#fff;border-color:#666" onclick="clearSelection()">✕ Clear</button>
+    <button class="btn btn-outline" style="color:#fff;border-color:#555" onclick="clearSel()">✕</button>
 </div>
 
-<!-- Add to Playlist Modal -->
-<div class="cm-modal-overlay" id="playlist-modal">
+<div class="cm-modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
     <div class="cm-modal">
         <h2>Add to Playlist</h2>
-        <p style="color:#888;font-size:13px;margin-bottom:12px;">
-            Select a playlist and enter duration (seconds) for each item.
-        </p>
-        <select id="playlist-select">
-            <option value="">-- Select Playlist --</option>
-        </select>
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-            <label style="font-size:13px;white-space:nowrap;">Duration (sec):</label>
-            <input type="number" id="item-duration" value="10" min="1" max="3600"
-                   style="width:80px;padding:8px;border:1.5px solid #e0e0e0;border-radius:6px;font-size:14px;" />
-        </div>
-        <div class="cm-modal-actions">
+        <select id="plSelect"><option value="">-- Select Playlist --</option></select>
+        <label style="font-size:12px;color:#666;">Duration per item (seconds)</label>
+        <input type="number" id="durInput" value="10" min="1" max="3600" />
+        <div class="cm-modal-btns">
             <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
-            <button class="btn btn-primary" onclick="confirmAddToPlaylist()">Add Items</button>
+            <button class="btn btn-primary" onclick="confirmAdd()">Add Items</button>
         </div>
     </div>
 </div>
 
 <script>
 const CSRF = "{{ csrf_token }}";
-let allContent = [];
+const API  = "/api/method/";
+let allItems = [];
 let selected = new Set();
 
+// ── API helper ────────────────────────────────────────────────────────────────
+async function api(method, args) {
+    const res = await fetch(API + method, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-Frappe-CSRF-Token": CSRF,
+            "Accept": "application/json"
+        },
+        body: JSON.stringify(args)
+    });
+    const data = await res.json();
+    if (data.exc) throw new Error(data.exc);
+    return data.message;
+}
+
 // ── Load content ──────────────────────────────────────────────────────────────
-async function loadContent() {
+async function load() {
     try {
-        const res = await frappe.call({
-            method: "frappe.client.get_list",
-            args: {
-                doctype: "Content",
-                fields: ["content_name", "content_type", "media_image",
-                         "youtube_embed_url", "video_file", "webpage_url",
-                         "redirect_url", "notes", "modified"],
-                limit: 200,
-                order_by: "modified desc"
-            }
+        const items = await api("frappe.client.get_list", {
+            doctype: "Content",
+            fields: ["name","content_name","content_type","media_image",
+                     "youtube_embed_url","video_file","webpage_url","redirect_url","modified"],
+            limit: 500,
+            order_by: "modified desc"
         });
-        allContent = res.message || [];
-        renderGallery(allContent);
-        document.getElementById("total-count").textContent = allContent.length;
+        allItems = items || [];
+        render(allItems);
+        document.getElementById("totalCount").textContent = allItems.length;
     } catch(e) {
         document.getElementById("gallery").innerHTML =
-            '<div class="cm-empty"><div class="cm-empty-icon">⚠️</div><p>Failed to load content. Please refresh.</p></div>';
+            '<div class="cm-empty"><div class="cm-empty-icon">⚠️</div><p>Failed to load content.<br>Please refresh the page.</p></div>';
+        console.error("Load error:", e);
     }
 }
 
-// ── Render gallery ────────────────────────────────────────────────────────────
-function renderGallery(items) {
-    const gallery = document.getElementById("gallery");
-    if (items.length === 0) {
-        gallery.innerHTML = `
-            <div class="cm-empty">
-                <div class="cm-empty-icon">🖼</div>
-                <p>No content yet. Upload your first image or video!</p>
-            </div>
-            <label class="cm-dropzone" for="file-input">
-                <div style="font-size:32px">⬆️</div>
-                <p>Click to upload or drag & drop files here</p>
-                <p style="font-size:12px;margin-top:4px;">Images, Videos, PDFs supported</p>
-            </label>`;
+// ── Render ────────────────────────────────────────────────────────────────────
+function render(items) {
+    const g = document.getElementById("gallery");
+    if (!items.length) {
+        g.innerHTML = `<div class="cm-empty"><div class="cm-empty-icon">🖼</div>
+            <p>No content yet. Upload your first image!</p></div>` + dropzoneHTML();
+        bindDrop();
         return;
     }
-
-    gallery.innerHTML = items.map(item => buildCard(item)).join("") + `
-        <label class="cm-dropzone" for="file-input" id="dropzone"
-               ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
-            <div style="font-size:32px">⬆️</div>
-            <p>Click to upload or drag & drop</p>
-            <p style="font-size:12px;margin-top:4px;">Images, Videos, PDFs (multiple files at once)</p>
-        </label>`;
+    g.innerHTML = items.map(card).join("") + dropzoneHTML();
+    bindDrop();
 }
 
-function buildCard(item) {
-    const t = item.content_type || "Image";
-    const isSelected = selected.has(item.content_name);
-    const preview = buildPreview(item, t);
-    const badge = t;
-    const meta = item.modified ? item.modified.split(" ")[0] : "";
+function dropzoneHTML() {
+    return `<label class="cm-dropzone" id="dropzone" for="fileInput"
+        ondragover="ev(event,'over')" ondragleave="ev(event,'leave')" ondrop="drop(event)">
+        <div style="font-size:30px">⬆️</div>
+        <p>Click or drag & drop to upload</p>
+        <p style="font-size:11px;margin-top:4px;">Images · Videos · PDFs — multiple files at once</p>
+    </label>`;
+}
 
-    return `<div class="cm-card ${isSelected ? 'selected' : ''}"
-                 data-name="${item.content_name}"
-                 onclick="toggleSelect('${item.content_name}', event)">
-        <div class="cm-check"></div>
-        <div class="cm-type-badge">${badge}</div>
-        <div class="cm-preview ${previewClass(t)}">${preview}</div>
-        <div class="cm-card-info">
-            <div class="cm-card-name" title="${item.content_name}">${item.content_name}</div>
-            <div class="cm-card-meta">${meta}</div>
+function bindDrop() {}
+
+function ev(e, t) {
+    e.preventDefault();
+    document.getElementById("dropzone")?.classList.toggle("over", t==="over");
+}
+
+function drop(e) {
+    e.preventDefault();
+    document.getElementById("dropzone")?.classList.remove("over");
+    upload(e.dataTransfer.files);
+}
+
+const THUMB_BG = {
+    "Video":"#0d1b3e","YouTube":"#c00","PDF":"#7f0000",
+    "Clock":"#0a0a1a","Webpage":"#0d47a1","URL Redirect":"#1a237e"
+};
+
+function card(item) {
+    const t = item.content_type || "Image";
+    const sel = selected.has(item.name);
+    const displayName = item.content_name || item.name;
+    let thumb = "";
+    if (t === "Image" && item.media_image) {
+        thumb = `<img src="${item.media_image}" loading="lazy" />`;
+    } else {
+        const icons = {Video:"🎬",YouTube:"▶️",PDF:"📄",Clock:"🕐",Webpage:"🌐","URL Redirect":"🔗"};
+        thumb = `<div class="cm-thumb-icon">${icons[t]||"📁"}</div>`;
+    }
+    const bg = THUMB_BG[t] || "#1a1a2a";
+    return `<div class="cm-card${sel?" selected":""}" data-id="${item.name}" onclick="toggle('${item.name}')">
+        <div class="cm-check"><span class="cm-check-icon">✓</span></div>
+        <div class="cm-badge">${t}</div>
+        <div class="cm-thumb" style="background:${bg}">${thumb}</div>
+        <div class="cm-info">
+            <div class="cm-info-name" title="${displayName}">${displayName}</div>
         </div>
     </div>`;
 }
 
-function previewClass(t) {
-    const map = {
-        "YouTube": "cm-preview-youtube",
-        "Video": "cm-preview-video",
-        "PDF": "cm-preview-pdf",
-        "Clock": "cm-preview-clock",
-        "Webpage": "cm-preview-webpage",
-        "URL Redirect": "cm-preview-webpage",
-    };
-    return map[t] || "";
-}
-
-function buildPreview(item, t) {
-    if (t === "Image" && item.media_image) {
-        return `<img src="${item.media_image}" loading="lazy" />`;
-    }
-    const icons = {
-        "Video": "🎬", "YouTube": "▶️", "PDF": "📄",
-        "Clock": "🕐", "Webpage": "🌐", "URL Redirect": "🔗"
-    };
-    const label = { "Video":"VIDEO","YouTube":"YOUTUBE","PDF":"PDF","Clock":"CLOCK","Webpage":"WEB","URL Redirect":"URL" };
-    return `<div class="cm-preview-icon">${icons[t] || "📁"}</div>`;
-}
-
 // ── Selection ─────────────────────────────────────────────────────────────────
-function toggleSelect(name, event) {
-    // If clicking on the card body (not a button), toggle selection
-    if (selected.has(name)) {
-        selected.delete(name);
-    } else {
-        selected.add(name);
-    }
-    updateSelectionUI();
+function toggle(id) {
+    selected.has(id) ? selected.delete(id) : selected.add(id);
+    updateSel();
 }
 
-function updateSelectionUI() {
-    const count = selected.size;
-    document.getElementById("selected-count").textContent = count;
-    document.getElementById("sel-count-label").textContent = `${count} selected`;
-    document.getElementById("btn-delete").disabled = count === 0;
-    document.getElementById("btn-add-playlist").disabled = count === 0;
-
-    const bar = document.getElementById("selection-bar");
-    bar.classList.toggle("visible", count > 0);
-
-    // Update card styles
-    document.querySelectorAll(".cm-card").forEach(card => {
-        const name = card.dataset.name;
-        card.classList.toggle("selected", selected.has(name));
+function updateSel() {
+    const n = selected.size;
+    document.getElementById("selCount").textContent = n;
+    document.getElementById("barCount").textContent = `${n} selected`;
+    document.getElementById("btnDel").disabled = n === 0;
+    document.getElementById("btnPlaylist").disabled = n === 0;
+    document.getElementById("selBar").classList.toggle("show", n > 0);
+    document.querySelectorAll(".cm-card").forEach(c => {
+        c.classList.toggle("selected", selected.has(c.dataset.id));
     });
 }
 
-function clearSelection() {
-    selected.clear();
-    updateSelectionUI();
-}
+function clearSel() { selected.clear(); updateSel(); }
 
-document.getElementById("btn-select-all").addEventListener("click", () => {
-    if (selected.size === allContent.length) {
-        clearSelection();
-    } else {
-        allContent.forEach(c => selected.add(c.content_name));
-        updateSelectionUI();
-    }
-});
+document.getElementById("btnSelAll").onclick = () => {
+    if (selected.size === allItems.length) clearSel();
+    else { allItems.forEach(i => selected.add(i.name)); updateSel(); }
+};
 
 // ── Upload ────────────────────────────────────────────────────────────────────
-async function handleFileUpload(files) {
-    if (!files || files.length === 0) return;
-    const progressEl = document.getElementById("upload-progress");
-    const statusEl = document.getElementById("upload-status");
-    const fillEl = document.getElementById("progress-fill");
-    progressEl.classList.add("visible");
+document.getElementById("fileInput").onchange = e => upload(e.target.files);
 
+async function upload(files) {
+    if (!files || !files.length) return;
+    const bar = document.getElementById("uploadBar");
+    const status = document.getElementById("uploadStatus");
+    const fill = document.getElementById("progFill");
+    bar.classList.add("show");
     let done = 0;
-    const total = files.length;
 
     for (const file of files) {
-        statusEl.textContent = `${done + 1} / ${total} — ${file.name}`;
-        fillEl.style.width = `${Math.round((done / total) * 100)}%`;
-
+        status.textContent = `Uploading ${done+1}/${files.length}: ${file.name}`;
+        fill.style.width = `${Math.round(done/files.length*100)}%`;
         try {
-            // 1. Upload the file to Frappe
-            const formData = new FormData();
-            formData.append("file", file);
-            formData.append("is_private", "0");
-            formData.append("doctype", "Content");
+            // Step 1: Upload file — always public (is_private=0)
+            const fd = new FormData();
+            fd.append("file", file);
+            fd.append("is_private", "0");   // ← always public
+            fd.append("folder", "Home/Signage");
 
-            const uploadRes = await fetch("/api/method/upload_file", {
+            const up = await fetch("/api/method/upload_file", {
                 method: "POST",
                 headers: { "X-Frappe-CSRF-Token": CSRF },
-                body: formData,
+                body: fd
             });
-            const uploadData = await uploadRes.json();
-            const fileUrl = uploadData.message?.file_url;
-            if (!fileUrl) throw new Error("Upload failed");
+            const upData = await up.json();
+            const fileUrl = upData.message?.file_url;
+            if (!fileUrl) throw new Error("No file URL returned");
 
-            // 2. Determine content type from file
-            let content_type = "Image";
-            if (file.type.startsWith("video/")) content_type = "Video";
-            else if (file.type === "application/pdf") content_type = "PDF";
+            // Step 2: Determine type
+            let ctype = "Image";
+            if (file.type.startsWith("video/")) ctype = "Video";
+            else if (file.type === "application/pdf") ctype = "PDF";
 
-            // 3. Create Content record via our API (auto-generates name)
-            await frappe.call({
-                method: "signage_display.signage_display.doctype.content.content.create_content_from_upload",
-                args: {
-                    file_url: fileUrl,
-                    content_type: content_type,
-                    content_name: ""   // blank = auto-generate from filename
-                }
+            // Step 3: Create Content record
+            await api("signage_display.signage_display.doctype.content.content.create_content_from_upload", {
+                file_url: fileUrl,
+                content_type: ctype,
+                content_name: ""
             });
 
         } catch(err) {
-            console.error("Upload error for", file.name, err);
-            frappe.show_alert({ message: `Failed: ${file.name}`, indicator: "red" });
+            console.error("Upload failed:", file.name, err);
+            alert(`Upload failed: ${file.name}\n${err.message}`);
         }
         done++;
     }
 
-    fillEl.style.width = "100%";
-    statusEl.textContent = `Done! ${done} file(s) uploaded.`;
-    setTimeout(() => {
-        progressEl.classList.remove("visible");
-        fillEl.style.width = "0%";
-    }, 2000);
-
-    // Reset file input and reload
-    document.getElementById("file-input").value = "";
-    await loadContent();
-    frappe.show_alert({ message: `${done} file(s) uploaded successfully`, indicator: "green" });
-}
-
-// ── Drag & Drop ───────────────────────────────────────────────────────────────
-function onDragOver(e) {
-    e.preventDefault();
-    document.getElementById("dropzone")?.classList.add("drag-over");
-}
-function onDragLeave(e) {
-    document.getElementById("dropzone")?.classList.remove("drag-over");
-}
-function onDrop(e) {
-    e.preventDefault();
-    document.getElementById("dropzone")?.classList.remove("drag-over");
-    handleFileUpload(e.dataTransfer.files);
+    fill.style.width = "100%";
+    status.textContent = `Done! ${done} file(s) uploaded.`;
+    setTimeout(() => { bar.classList.remove("show"); fill.style.width="0%"; }, 2500);
+    document.getElementById("fileInput").value = "";
+    await load();
 }
 
 // ── Delete ────────────────────────────────────────────────────────────────────
 async function deleteSelected() {
-    if (selected.size === 0) return;
-    frappe.confirm(
-        `Delete ${selected.size} item(s)? This cannot be undone.`,
-        async () => {
-            let deleted = 0;
-            for (const name of selected) {
-                try {
-                    await frappe.call({
-                        method: "frappe.client.delete",
-                        args: { doctype: "Content", name }
-                    });
-                    deleted++;
-                } catch(e) {
-                    console.error("Delete failed:", name, e);
-                }
-            }
-            frappe.show_alert({ message: `Deleted ${deleted} item(s)`, indicator: "green" });
-            selected.clear();
-            await loadContent();
-            updateSelectionUI();
-        }
-    );
+    if (!selected.size) return;
+    if (!confirm(`Delete ${selected.size} item(s)? This cannot be undone.`)) return;
+    for (const id of selected) {
+        try { await api("frappe.client.delete", { doctype: "Content", name: id }); }
+        catch(e) { console.error("Delete failed:", id, e); }
+    }
+    selected.clear();
+    await load();
+    updateSel();
 }
 
 // ── Add to Playlist ───────────────────────────────────────────────────────────
-async function openAddToPlaylistModal() {
-    // Load playlists
-    const res = await frappe.call({
-        method: "frappe.client.get_list",
-        args: { doctype: "Playlist", fields: ["playlist_name"], limit: 100 }
-    });
-    const playlists = res.message || [];
-    const sel = document.getElementById("playlist-select");
-    sel.innerHTML = '<option value="">-- Select Playlist --</option>' +
-        playlists.map(p => `<option value="${p.playlist_name}">${p.playlist_name}</option>`).join("");
-
-    document.getElementById("playlist-modal").classList.add("open");
-}
-
-function closeModal() {
-    document.getElementById("playlist-modal").classList.remove("open");
-}
-
-async function confirmAddToPlaylist() {
-    const playlistName = document.getElementById("playlist-select").value;
-    const duration = parseInt(document.getElementById("item-duration").value) || 10;
-
-    if (!playlistName) {
-        frappe.show_alert({ message: "Please select a playlist", indicator: "orange" });
-        return;
-    }
-    if (selected.size === 0) {
-        frappe.show_alert({ message: "No items selected", indicator: "orange" });
-        return;
-    }
-
+async function openModal() {
     try {
-        // Get current playlist doc
-        const res = await frappe.call({
-            method: "frappe.client.get",
-            args: { doctype: "Playlist", name: playlistName }
+        const pls = await api("frappe.client.get_list", {
+            doctype: "Playlist", fields: ["name","playlist_name"], limit: 100
         });
-        const doc = res.message;
-
-        // Add selected items to the items child table
-        selected.forEach(contentName => {
-            // Avoid duplicate
-            const exists = (doc.items || []).some(i => i.content === contentName);
-            if (!exists) {
-                doc.items = doc.items || [];
-                doc.items.push({
-                    doctype: "Playlist Item",
-                    content: contentName,
-                    duration_sec: duration,
-                    is_active: 1,
-                });
-            }
-        });
-
-        await frappe.call({
-            method: "frappe.client.save",
-            args: { doc }
-        });
-
-        frappe.show_alert({
-            message: `Added ${selected.size} item(s) to "${playlistName}"`,
-            indicator: "green"
-        });
-        closeModal();
-        clearSelection();
-    } catch(err) {
-        frappe.show_alert({ message: "Failed to add to playlist: " + err.message, indicator: "red" });
-    }
+        const sel = document.getElementById("plSelect");
+        sel.innerHTML = '<option value="">-- Select Playlist --</option>' +
+            (pls||[]).map(p => `<option value="${p.name}">${p.playlist_name||p.name}</option>`).join("");
+    } catch(e) { console.error(e); }
+    document.getElementById("modalBg").classList.add("open");
 }
 
-document.getElementById("btn-add-playlist").addEventListener("click", openAddToPlaylistModal);
-document.getElementById("btn-delete").addEventListener("click", deleteSelected);
+function closeModal() { document.getElementById("modalBg").classList.remove("open"); }
 
-// Close modal on overlay click
-document.getElementById("playlist-modal").addEventListener("click", function(e) {
-    if (e.target === this) closeModal();
-});
+async function confirmAdd() {
+    const plName = document.getElementById("plSelect").value;
+    const dur = parseInt(document.getElementById("durInput").value) || 10;
+    if (!plName) { alert("Please select a playlist"); return; }
+    if (!selected.size) { alert("No items selected"); return; }
+    try {
+        const doc = await api("frappe.client.get", { doctype: "Playlist", name: plName });
+        doc.items = doc.items || [];
+        const existing = new Set(doc.items.map(i => i.content));
+        for (const id of selected) {
+            // Find content_name from allItems
+            const item = allItems.find(i => i.name === id);
+            const contentName = item?.content_name || id;
+            if (!existing.has(contentName)) {
+                doc.items.push({ doctype:"Playlist Item", content:contentName, duration_sec:dur, is_active:1 });
+            }
+        }
+        await api("frappe.client.save", { doc });
+        alert(`Added ${selected.size} item(s) to playlist!`);
+        closeModal();
+        clearSel();
+    } catch(e) {
+        alert("Failed: " + (e.message || e));
+        console.error(e);
+    }
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-loadContent();
+load();
 </script>
 {% endblock %}
