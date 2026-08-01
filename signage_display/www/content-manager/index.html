@@ -124,6 +124,7 @@ let selected = new Set();
 async function api(method, args) {
     const res = await fetch(API + method, {
         method: "POST",
+        credentials: "same-origin",   // ensure session cookie is always sent
         headers: {
             "Content-Type": "application/json",
             "X-Frappe-CSRF-Token": CSRF,
@@ -132,6 +133,9 @@ async function api(method, args) {
         body: JSON.stringify(args)
     });
     const data = await res.json();
+    if (data.exc_type === "CSRFTokenError" || (data.exc && data.exc.includes("CSRFTokenError"))) {
+        throw new Error("Session expired or CSRF token invalid. Please refresh the page (Ctrl+Shift+R) and try again.");
+    }
     if (data.exc) throw new Error(data.exc);
     return data.message;
 }
@@ -141,6 +145,7 @@ async function load() {
         // Fetch raw response first so we can inspect exactly what came back
         const res = await fetch(API + "frappe.client.get_list", {
             method: "POST",
+            credentials: "same-origin",
             headers: {
                 "Content-Type": "application/json",
                 "X-Frappe-CSRF-Token": CSRF,
@@ -162,6 +167,9 @@ async function load() {
             throw new Error(`Non-JSON response (HTTP ${res.status}): ${rawText.substring(0,300)}`);
         }
 
+        if (data.exc_type === "CSRFTokenError") {
+            throw new Error("CSRF token invalid — please hard-refresh this page (Ctrl+Shift+R) and try again.");
+        }
         if (data.exc || data.exception) {
             throw new Error(data.exception || data.exc);
         }
@@ -294,6 +302,7 @@ async function upload(files) {
 
             const up = await fetch("/api/method/upload_file", {
                 method: "POST",
+                credentials: "same-origin",
                 headers: { "X-Frappe-CSRF-Token": CSRF },
                 body: fd
             });
