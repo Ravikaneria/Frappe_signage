@@ -9,11 +9,9 @@ app_version = "2.0.0"
 website_route_rules = [
     {"from_route": "/display/<path:screen_id>", "to_route": "display"},
     {"from_route": "/content-manager", "to_route": "content-manager/index"},
+    {"from_route": "/playlist-manager", "to_route": "playlist-manager/index"},
 ]
 
-# Reduced from "all" (runs every ~4 min) to explicit cron every 5 minutes.
-# This is a lighter, predictable schedule that reduces background compute
-# while still catching offline screens promptly.
 scheduler_events = {
     "cron": {
         "*/5 * * * *": [

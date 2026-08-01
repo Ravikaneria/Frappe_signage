@@ -64,6 +64,16 @@ body{background:#f5f6fa;font-family:'Segoe UI',sans-serif;color:#222;}
 .cm-prog-track{height:5px;background:#eee;border-radius:3px;margin-top:5px;overflow:hidden;}
 .cm-prog-fill{height:100%;background:#4CAF50;border-radius:3px;width:0%;transition:width 0.2s;}
 .cm-error-log{color:#c62828;font-size:11px;margin-top:4px;white-space:pre-wrap;max-height:80px;overflow-y:auto;}
+/* ── Zoom Lightbox ── */
+.cm-lightbox-bg{position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:400;display:none;align-items:center;justify-content:center;cursor:zoom-out;}
+.cm-lightbox-bg.open{display:flex;}
+.cm-lightbox-img{max-width:90vw;max-height:85vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.5);}
+.cm-lightbox-caption{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);color:#fff;font-size:14px;background:rgba(0,0,0,0.5);padding:8px 18px;border-radius:20px;}
+.cm-lightbox-close{position:absolute;top:20px;right:28px;color:#fff;font-size:32px;cursor:pointer;line-height:1;}
+.cm-thumb{cursor:zoom-in;}
+/* Crop thumbnails square, like PosterBooking */
+.cm-thumb img{object-fit:cover;width:100%;height:100%;}
+
 </style>
 {% endblock %}
 
@@ -73,6 +83,7 @@ body{background:#f5f6fa;font-family:'Segoe UI',sans-serif;color:#222;}
 {% block page_content %}
 <div class="cm-topbar">
     <h1>📁 Content Manager</h1>
+    <button class="btn btn-outline" onclick="location.href='/playlist-manager'">📋 Playlist Manager</button>
     <button class="btn btn-outline" onclick="location.href='/app/content'">ERPNext View</button>
     <button class="btn btn-outline" id="btnSelAll">Select All</button>
     <button class="btn btn-danger" id="btnDel" disabled onclick="deleteSelected()">🗑 Delete</button>
@@ -100,6 +111,12 @@ body{background:#f5f6fa;font-family:'Segoe UI',sans-serif;color:#222;}
     <button class="btn btn-primary" onclick="openModal()">＋ Add to Playlist</button>
     <button class="btn btn-danger" onclick="deleteSelected()">🗑 Delete</button>
     <button class="btn btn-outline" style="color:#fff;border-color:#555" onclick="clearSel()">✕</button>
+</div>
+
+<div class="cm-lightbox-bg" id="lightboxBg" onclick="closeLightbox()">
+    <span class="cm-lightbox-close" onclick="closeLightbox()">&times;</span>
+    <img class="cm-lightbox-img" id="lightboxImg" src="" alt="" onclick="event.stopPropagation()" />
+    <div class="cm-lightbox-caption" id="lightboxCaption"></div>
 </div>
 
 <div class="cm-modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
@@ -233,8 +250,11 @@ function card(item) {
     const sel = selected.has(item.name);
     const displayName = item.content_name || item.name;
     let thumb = "";
+    let zoomAttr = "";
     if (t === "Image" && item.media_image) {
         thumb = `<img src="${item.media_image}" loading="lazy" />`;
+        // Clicking the image itself zooms; clicking elsewhere on card selects
+        zoomAttr = `onclick="event.stopPropagation(); openLightbox('${item.media_image.replace(/'/g,"\\'")}', '${displayName.replace(/'/g,"\\'")}')"`;
     } else {
         const icons = {Video:"🎬",YouTube:"▶️",PDF:"📄",Clock:"🕐",Webpage:"🌐","URL Redirect":"🔗"};
         thumb = `<div class="cm-thumb-icon">${icons[t]||"📁"}</div>`;
@@ -243,11 +263,21 @@ function card(item) {
     return `<div class="cm-card${sel?" selected":""}" data-id="${item.name}" onclick="toggle('${item.name}')">
         <div class="cm-check"><span class="cm-check-icon">✓</span></div>
         <div class="cm-badge">${t}</div>
-        <div class="cm-thumb" style="background:${bg}">${thumb}</div>
+        <div class="cm-thumb" style="background:${bg}" ${zoomAttr}>${thumb}</div>
         <div class="cm-info">
             <div class="cm-info-name" title="${displayName}">${displayName}</div>
         </div>
     </div>`;
+}
+
+function openLightbox(url, caption) {
+    document.getElementById("lightboxImg").src = url;
+    document.getElementById("lightboxCaption").textContent = caption;
+    document.getElementById("lightboxBg").classList.add("open");
+}
+function closeLightbox() {
+    document.getElementById("lightboxBg").classList.remove("open");
+    document.getElementById("lightboxImg").src = "";
 }
 
 function toggle(id) {

@@ -1,0 +1,396 @@
+{% extends "templates/web.html" %}
+{% block title %}Playlist Manager{% endblock %}
+
+{% block head_include %}
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#f5f6fa;font-family:'Segoe UI',sans-serif;color:#222;}
+
+/* ── Top banner (orange, matches PosterBooking) ── */
+.pl-banner{background:linear-gradient(135deg,#f5a623,#e8871e);color:#fff;padding:26px 28px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;}
+.pl-banner h1{font-size:26px;font-weight:700;}
+.pl-banner p{font-size:13px;opacity:0.92;margin-top:4px;max-width:480px;}
+.pl-banner-actions{display:flex;gap:10px;align-items:center;}
+.pl-count-pill{background:rgba(255,255,255,0.22);padding:6px 14px;border-radius:20px;font-size:13px;}
+
+.btn{padding:9px 18px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;}
+.btn-white{background:#fff;color:#e8871e;}
+.btn-white:hover{background:#fef6ec;}
+.btn-green{background:#4CAF50;color:#fff;}
+.btn-green:hover{background:#388E3C;}
+.btn-outline{background:#fff;color:#333;border:1.5px solid #ddd;}
+.btn-outline:hover{background:#f5f5f5;}
+.btn-teal{background:#00acc1;color:#fff;}
+.btn-teal:hover{background:#00838f;}
+.btn-danger{background:#e53935;color:#fff;}
+.btn-danger:hover{background:#c62828;}
+.btn-sm{padding:6px 12px;font-size:12px;}
+
+/* ── Grid of playlist cards ── */
+.pl-grid{padding:20px 28px 60px;display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:20px;}
+
+.pl-card{background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.08);overflow:hidden;}
+
+.pl-card-head{padding:16px 18px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f0f0f0;}
+.pl-card-title{font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px;}
+.pl-published-dot{width:8px;height:8px;border-radius:50%;background:#4CAF50;}
+.pl-draft-dot{width:8px;height:8px;border-radius:50%;background:#bbb;}
+.pl-card-icons{display:flex;gap:6px;}
+.pl-icon-btn{width:32px;height:32px;border-radius:6px;border:1px solid #eee;background:#fafafa;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;}
+.pl-icon-btn:hover{background:#eee;}
+
+.pl-card-screens{padding:10px 18px;font-size:12px;color:#888;display:flex;align-items:center;gap:6px;border-bottom:1px solid #f5f5f5;}
+.pl-screen-chip{background:#f0f0f0;padding:2px 9px;border-radius:12px;color:#555;}
+
+.pl-content-row{padding:14px 18px;display:flex;gap:10px;overflow-x:auto;}
+.pl-content-empty{padding:24px 18px;text-align:center;color:#e8871e;font-size:13px;}
+
+.pl-item{flex:0 0 92px;text-align:center;}
+.pl-item-thumb{width:92px;height:92px;border-radius:8px;overflow:hidden;background:#1a1a2a;display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;}
+.pl-item-thumb img{width:100%;height:100%;object-fit:cover;}
+.pl-item-thumb .pl-item-icon{font-size:28px;opacity:0.8;}
+.pl-item-remove{position:absolute;top:2px;right:2px;width:18px;height:18px;background:rgba(220,50,50,0.85);color:#fff;border-radius:50%;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.pl-item-dur{margin-top:5px;font-size:10px;color:#888;}
+.pl-item-dur input{width:44px;text-align:center;border:1px solid #ddd;border-radius:4px;font-size:11px;padding:2px;}
+
+.pl-card-actions{padding:12px 18px 16px;display:flex;gap:8px;border-top:1px solid #f5f5f5;flex-wrap:wrap;}
+
+.pl-empty{grid-column:1/-1;text-align:center;padding:80px 20px;color:#bbb;}
+.pl-empty-icon{font-size:56px;}
+.pl-empty p{margin-top:10px;font-size:15px;}
+
+/* ── Modals ── */
+.pl-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:300;display:none;align-items:center;justify-content:center;}
+.pl-modal-bg.open{display:flex;}
+.pl-modal{background:#fff;border-radius:12px;padding:24px;width:520px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;}
+.pl-modal h2{font-size:17px;margin-bottom:14px;}
+.pl-modal input[type=text]{width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;margin-bottom:14px;}
+.pl-modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;}
+
+.pl-picker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;overflow-y:auto;flex:1;padding:4px;}
+.pl-picker-item{cursor:pointer;border:2px solid transparent;border-radius:8px;overflow:hidden;position:relative;}
+.pl-picker-item.picked{border-color:#4CAF50;}
+.pl-picker-thumb{width:100%;height:80px;background:#1a1a2a;display:flex;align-items:center;justify-content:center;}
+.pl-picker-thumb img{width:100%;height:100%;object-fit:cover;}
+.pl-picker-check{position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.4);border:2px solid #fff;display:none;align-items:center;justify-content:center;color:#fff;font-size:10px;}
+.pl-picker-item.picked .pl-picker-check{display:flex;background:#4CAF50;}
+
+.pl-screen-list{max-height:200px;overflow-y:auto;margin-bottom:12px;}
+.pl-screen-row{display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid #f5f5f5;font-size:13px;}
+</style>
+{% endblock %}
+
+{% block header %}{% endblock %}
+{% block navbar %}{% endblock %}
+
+{% block page_content %}
+<div class="pl-banner">
+    <div>
+        <h1>📋 Playlist Manager</h1>
+        <p>Organize your content into playlists, then assign each to one or more screens.</p>
+        <span class="pl-count-pill" id="plCountPill">0 playlists</span>
+    </div>
+    <div class="pl-banner-actions">
+        <button class="btn btn-outline" onclick="location.href='/content-manager'">📁 Content Manager</button>
+        <button class="btn btn-white" onclick="openNewPlaylistModal()">＋ Create Playlist</button>
+    </div>
+</div>
+
+<div class="pl-grid" id="plGrid">
+    <div class="pl-empty"><div class="pl-empty-icon">⏳</div><p>Loading playlists...</p></div>
+</div>
+
+<!-- New Playlist Modal -->
+<div class="pl-modal-bg" id="newPlModal" onclick="if(event.target===this)closeNewPlaylistModal()">
+    <div class="pl-modal" style="width:400px;">
+        <h2>Create New Playlist</h2>
+        <input type="text" id="newPlName" placeholder="e.g. Reception Playlist" />
+        <div class="pl-modal-btns">
+            <button class="btn btn-outline" onclick="closeNewPlaylistModal()">Cancel</button>
+            <button class="btn btn-green" onclick="createPlaylist()">Create</button>
+        </div>
+    </div>
+</div>
+
+<!-- Content Picker Modal -->
+<div class="pl-modal-bg" id="pickerModal" onclick="if(event.target===this)closePicker()">
+    <div class="pl-modal">
+        <h2 id="pickerTitle">Add Content</h2>
+        <div class="pl-picker-grid" id="pickerGrid"></div>
+        <div class="pl-modal-btns">
+            <button class="btn btn-outline" onclick="closePicker()">Cancel</button>
+            <button class="btn btn-green" onclick="confirmPicker()">Add Selected</button>
+        </div>
+    </div>
+</div>
+
+<!-- Assign to Screen Modal -->
+<div class="pl-modal-bg" id="screenModal" onclick="if(event.target===this)closeScreenModal()">
+    <div class="pl-modal" style="width:380px;">
+        <h2 id="screenModalTitle">Assign to Screen</h2>
+        <div class="pl-screen-list" id="screenList"></div>
+        <div class="pl-modal-btns">
+            <button class="btn btn-outline" onclick="closeScreenModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const CSRF = "{{ csrf_token }}";
+const API  = "/api/method/";
+let allPlaylists = [];
+let allContent = [];
+let allScreens = [];
+let activePlaylistDoc = null;   // full doc while editing content picker
+let pickerSelected = new Set();
+
+async function api(method, args) {
+    const res = await fetch(API + method, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-Frappe-CSRF-Token": CSRF, "Accept": "application/json" },
+        body: JSON.stringify(args)
+    });
+    const data = await res.json();
+    if (data.exc_type === "CSRFTokenError") throw new Error("Session expired — please refresh (Ctrl+Shift+R).");
+    if (data.exc) throw new Error(data.exc);
+    return data.message;
+}
+
+const THUMB_BG = {"Video":"#0d1b3e","YouTube":"#c00","PDF":"#7f0000","Clock":"#0a0a1a","Webpage":"#0d47a1","URL Redirect":"#1a237e"};
+const TYPE_ICON = {Video:"🎬",YouTube:"▶️",PDF:"📄",Clock:"🕐",Webpage:"🌐","URL Redirect":"🔗",Image:"🖼"};
+
+// ── Load everything ────────────────────────────────────────────────────────
+async function loadAll() {
+    try {
+        [allPlaylists, allContent, allScreens] = await Promise.all([
+            api("frappe.client.get_list", {
+                doctype: "Playlist",
+                fields: ["name","playlist_name","is_published"],
+                limit_page_length: 0, order_by: "modified desc"
+            }),
+            api("frappe.client.get_list", {
+                doctype: "Content",
+                fields: ["name","content_name","content_type","media_image"],
+                limit_page_length: 0
+            }),
+            api("frappe.client.get_list", {
+                doctype: "Screen",
+                fields: ["name","screen_name","default_playlist"],
+                limit_page_length: 0
+            })
+        ]);
+        document.getElementById("plCountPill").textContent = `${allPlaylists.length} playlist(s)`;
+        await renderGrid();
+    } catch(e) {
+        document.getElementById("plGrid").innerHTML =
+            `<div class="pl-empty"><div class="pl-empty-icon">⚠️</div><p>${e.message}</p></div>`;
+        console.error(e);
+    }
+}
+
+// ── Render playlist cards ─────────────────────────────────────────────────
+async function renderGrid() {
+    const grid = document.getElementById("plGrid");
+    if (!allPlaylists.length) {
+        grid.innerHTML = `<div class="pl-empty"><div class="pl-empty-icon">📋</div>
+            <p>No playlists yet. Create your first one!</p></div>`;
+        return;
+    }
+
+    // Fetch full docs (with items) for all playlists in parallel
+    const fullDocs = await Promise.all(
+        allPlaylists.map(p => api("frappe.client.get", { doctype: "Playlist", name: p.name }).catch(() => null))
+    );
+
+    grid.innerHTML = fullDocs.filter(Boolean).map(playlistCard).join("");
+}
+
+function playlistCard(doc) {
+    const assignedScreens = allScreens.filter(s => s.default_playlist === doc.name);
+    const items = doc.items || [];
+    const dot = doc.is_published ? "pl-published-dot" : "pl-draft-dot";
+    const statusLabel = doc.is_published ? "Published" : "Draft";
+
+    const screensHtml = assignedScreens.length
+        ? assignedScreens.map(s => `<span class="pl-screen-chip">${s.screen_name}</span>`).join("")
+        : `<span style="color:#bbb;">No screens assigned</span>`;
+
+    const itemsHtml = items.length
+        ? items.map((it, idx) => itemThumb(doc.name, it, idx)).join("")
+        : `<div class="pl-content-empty">No content yet — click "Add Content" below</div>`;
+
+    return `<div class="pl-card" data-playlist="${doc.name}">
+        <div class="pl-card-head">
+            <div class="pl-card-title"><span class="${dot}"></span> ${doc.playlist_name}</div>
+            <div class="pl-card-icons">
+                <div class="pl-icon-btn" title="${statusLabel}" onclick="togglePublish('${doc.name}', ${doc.is_published?0:1})">
+                    ${doc.is_published ? "✅" : "⭕"}
+                </div>
+            </div>
+        </div>
+        <div class="pl-card-screens">📺 ${screensHtml}</div>
+        <div class="pl-content-row">${itemsHtml}</div>
+        <div class="pl-card-actions">
+            <button class="btn btn-teal btn-sm" onclick="openPicker('${doc.name}')">＋ Add Content</button>
+            <button class="btn btn-outline btn-sm" onclick="openScreenModal('${doc.name}', '${doc.playlist_name.replace(/'/g,"\\\\'")}')">📺 Assign Screen</button>
+            <button class="btn btn-danger btn-sm" onclick="deletePlaylist('${doc.name}', '${doc.playlist_name.replace(/'/g,"\\\\'")}')">🗑 Delete</button>
+        </div>
+    </div>`;
+}
+
+function itemThumb(playlistName, item, idx) {
+    const contentInfo = allContent.find(c => c.content_name === item.content || c.name === item.content);
+    const t = contentInfo?.content_type || "Image";
+    let thumb;
+    if (t === "Image" && contentInfo?.media_image) {
+        thumb = `<img src="${contentInfo.media_image}" />`;
+    } else {
+        thumb = `<div class="pl-item-icon">${TYPE_ICON[t]||"📁"}</div>`;
+    }
+    const bg = THUMB_BG[t] || "#1a1a2a";
+    return `<div class="pl-item">
+        <div class="pl-item-thumb" style="background:${bg}">
+            ${thumb}
+            <div class="pl-item-remove" onclick="removeItem('${playlistName}', ${idx})">✕</div>
+        </div>
+        <div class="pl-item-dur">
+            <input type="number" value="${item.duration_sec||10}" min="1" max="3600"
+                   onchange="updateDuration('${playlistName}', ${idx}, this.value)" /> s
+        </div>
+    </div>`;
+}
+
+// ── Create Playlist ────────────────────────────────────────────────────────
+function openNewPlaylistModal() {
+    document.getElementById("newPlName").value = "";
+    document.getElementById("newPlModal").classList.add("open");
+}
+function closeNewPlaylistModal() { document.getElementById("newPlModal").classList.remove("open"); }
+
+async function createPlaylist() {
+    const name = document.getElementById("newPlName").value.trim();
+    if (!name) { alert("Please enter a playlist name"); return; }
+    try {
+        await api("frappe.client.insert", {
+            doc: { doctype: "Playlist", playlist_name: name, is_published: 1, items: [] }
+        });
+        closeNewPlaylistModal();
+        await loadAll();
+    } catch(e) { alert("Failed: " + e.message); }
+}
+
+// ── Publish toggle ─────────────────────────────────────────────────────────
+async function togglePublish(name, newVal) {
+    try {
+        await api("frappe.client.set_value", { doctype: "Playlist", name, fieldname: "is_published", value: newVal });
+        await loadAll();
+    } catch(e) { alert("Failed: " + e.message); }
+}
+
+// ── Delete Playlist ────────────────────────────────────────────────────────
+async function deletePlaylist(name, label) {
+    if (!confirm(`Delete playlist "${label}"? This cannot be undone.`)) return;
+    try {
+        await api("frappe.client.delete", { doctype: "Playlist", name });
+        await loadAll();
+    } catch(e) { alert("Failed: " + e.message); }
+}
+
+// ── Content Picker ─────────────────────────────────────────────────────────
+async function openPicker(playlistName) {
+    activePlaylistDoc = await api("frappe.client.get", { doctype: "Playlist", name: playlistName });
+    pickerSelected = new Set((activePlaylistDoc.items||[]).map(i => i.content));
+    document.getElementById("pickerTitle").textContent = `Add Content — ${activePlaylistDoc.playlist_name}`;
+    renderPickerGrid();
+    document.getElementById("pickerModal").classList.add("open");
+}
+function closePicker() { document.getElementById("pickerModal").classList.remove("open"); activePlaylistDoc = null; }
+
+function renderPickerGrid() {
+    const g = document.getElementById("pickerGrid");
+    g.innerHTML = allContent.map(c => {
+        const picked = pickerSelected.has(c.content_name);
+        const t = c.content_type || "Image";
+        let thumb = t === "Image" && c.media_image
+            ? `<img src="${c.media_image}" />`
+            : `<div style="font-size:22px;">${TYPE_ICON[t]||"📁"}</div>`;
+        const bg = THUMB_BG[t] || "#1a1a2a";
+        return `<div class="pl-picker-item${picked?" picked":""}" onclick="togglePicker('${c.content_name}')">
+            <div class="pl-picker-thumb" style="background:${bg}">${thumb}</div>
+            <div class="pl-picker-check">✓</div>
+        </div>`;
+    }).join("");
+}
+
+function togglePicker(contentName) {
+    pickerSelected.has(contentName) ? pickerSelected.delete(contentName) : pickerSelected.add(contentName);
+    renderPickerGrid();
+}
+
+async function confirmPicker() {
+    if (!activePlaylistDoc) return;
+    const existing = new Map((activePlaylistDoc.items||[]).map(i => [i.content, i]));
+    const newItems = [];
+    pickerSelected.forEach(contentName => {
+        if (existing.has(contentName)) {
+            newItems.push(existing.get(contentName));
+        } else {
+            newItems.push({ doctype: "Playlist Item", content: contentName, duration_sec: 10, is_active: 1 });
+        }
+    });
+    activePlaylistDoc.items = newItems;
+    try {
+        await api("frappe.client.save", { doc: activePlaylistDoc });
+        closePicker();
+        await loadAll();
+    } catch(e) { alert("Failed: " + e.message); }
+}
+
+// ── Remove item / update duration inline ──────────────────────────────────
+async function removeItem(playlistName, idx) {
+    try {
+        const doc = await api("frappe.client.get", { doctype: "Playlist", name: playlistName });
+        doc.items.splice(idx, 1);
+        await api("frappe.client.save", { doc });
+        await loadAll();
+    } catch(e) { alert("Failed: " + e.message); }
+}
+
+async function updateDuration(playlistName, idx, value) {
+    try {
+        const doc = await api("frappe.client.get", { doctype: "Playlist", name: playlistName });
+        doc.items[idx].duration_sec = parseInt(value) || 10;
+        await api("frappe.client.save", { doc });
+    } catch(e) { alert("Failed: " + e.message); }
+}
+
+// ── Assign to Screen ───────────────────────────────────────────────────────
+function openScreenModal(playlistName, playlistLabel) {
+    document.getElementById("screenModalTitle").textContent = `Assign "${playlistLabel}" to Screen`;
+    const list = document.getElementById("screenList");
+    if (!allScreens.length) {
+        list.innerHTML = `<p style="color:#888;font-size:13px;">No screens found. Create one in ERPNext first.</p>`;
+    } else {
+        list.innerHTML = allScreens.map(s => {
+            const checked = s.default_playlist === playlistName ? "checked" : "";
+            return `<div class="pl-screen-row">
+                <input type="checkbox" ${checked} onchange="setScreenPlaylist('${s.name}', this.checked ? '${playlistName}' : '')" />
+                <span>${s.screen_name}</span>
+            </div>`;
+        }).join("");
+    }
+    document.getElementById("screenModal").classList.add("open");
+}
+function closeScreenModal() { document.getElementById("screenModal").classList.remove("open"); loadAll(); }
+
+async function setScreenPlaylist(screenName, playlistName) {
+    try {
+        await api("frappe.client.set_value", { doctype: "Screen", name: screenName, fieldname: "default_playlist", value: playlistName });
+    } catch(e) { alert("Failed: " + e.message); }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+loadAll();
+</script>
+{% endblock %}
