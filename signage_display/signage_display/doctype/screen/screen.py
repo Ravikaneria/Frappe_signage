@@ -47,21 +47,7 @@ class Screen(Document):
                 doc.save(ignore_permissions=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  SCHEDULING ENGINE
-# ─────────────────────────────────────────────────────────────────────────────
-
 def get_active_playlists(screen_name, now=None):
-    """
-    Returns a LIST of all playlists whose schedule slots are active right now.
-
-    When multiple slots overlap in time (e.g. a "General" playlist running
-    08:00–18:00 and a "Lunch Menu" playlist running 12:00–13:00 both active
-    at 12:30), ALL matching playlists are returned and their content is merged
-    into one combined playlist for the display.
-
-    Returns [] if no slots match (caller uses default playlist).
-    """
     if now is None:
         now = frappe.utils.now_datetime()
 
@@ -83,7 +69,6 @@ def get_active_playlists(screen_name, now=None):
             continue
         if not _time_in_window(current_time, row.start_time, row.end_time):
             continue
-        # Avoid duplicate playlists (same playlist in multiple matching slots)
         if row.playlist and row.playlist not in seen:
             active_playlists.append(row.playlist)
             seen.add(row.playlist)
@@ -106,22 +91,15 @@ def _time_in_window(t, start, end):
     end   = _to_time(end)
     if start <= end:
         return start <= t <= end
-    # Overnight window e.g. 22:00–02:00
     return t >= start or t <= end
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  PLAYER API
-# ─────────────────────────────────────────────────────────────────────────────
 
 @frappe.whitelist(allow_guest=True)
 def get_content_for_screen(screen_id):
     """
-    Returns merged content from all currently-active schedule slots.
-
-    Example: if slot A (General, 08:00-18:00) and slot B (Lunch, 12:00-13:00)
-    both match at 12:30, the response combines content from BOTH playlists:
-    [General item 1, General item 2, Lunch item 1, Lunch item 2, ...]
+    Single combined API — returns content AND records the heartbeat.
+    This is the ONLY call the player makes (no separate heartbeat request),
+    which is the main compute-usage fix: was 2 requests/poll, now 1.
     """
     screen = frappe.db.get_value(
         "Screen",
@@ -132,26 +110,26 @@ def get_content_for_screen(screen_id):
     if not screen:
         return {"error": f"Screen '{screen_id}' not found or inactive.", "items": []}
 
-    _record_heartbeat(screen.name)
+    # Heartbeat recorded here — same call the player already makes every poll
+    frappe.db.set_value(
+        "Screen", screen.name,
+        {"is_live": 1, "last_seen": frappe.utils.now_datetime()},
+        update_modified=False,
+    )
+    frappe.db.commit()
+
     site_url = frappe.utils.get_url()
 
     from signage_display.signage_display.doctype.playlist.playlist import get_playlist_content
 
-    # Get all currently-active playlists (may be multiple if slots overlap)
     active_playlists = get_active_playlists(screen.name)
 
     if not active_playlists:
-        # No schedule slot matches — use default playlist
         if not screen.default_playlist:
             return {"error": "no_playlist", "items": []}
         active_playlists = [screen.default_playlist]
 
-    # Merge content from ALL active playlists in order
-    # No deduplication — each playlist plays fully even if they share content
-    # Example: General playlist (08:00-18:00) + Lunch playlist (12:00-13:00)
-    # at 12:30 shows: [General items...] + [Lunch items...]
     merged_items = []
-
     for playlist_name in active_playlists:
         items = get_playlist_content(playlist_name, site_url)
         merged_items.extend(items)
@@ -163,25 +141,13 @@ def get_content_for_screen(screen_id):
     }
 
 
-@frappe.whitelist(allow_guest=True)
-def screen_heartbeat(screen_id):
-    name = frappe.db.get_value("Screen", {"screen_id": screen_id}, "name")
-    if name:
-        _record_heartbeat(name)
-    return {"status": "ok"}
-
-
-def _record_heartbeat(screen_name):
-    frappe.db.set_value(
-        "Screen", screen_name,
-        {"is_live": 1, "last_seen": frappe.utils.now_datetime()},
-        update_modified=False,
-    )
-    frappe.db.commit()
-
-
 def mark_screens_offline():
-    cutoff = frappe.utils.add_to_date(frappe.utils.now_datetime(), seconds=-90)
+    """
+    Scheduler: runs periodically. Marks screens offline after no heartbeat.
+    Cutoff increased to 150s (was 90s) since the player now polls every
+    60s instead of 30s — this avoids false "offline" flapping.
+    """
+    cutoff = frappe.utils.add_to_date(frappe.utils.now_datetime(), seconds=-150)
     frappe.db.sql(
         "UPDATE `tabScreen` SET is_live=0 WHERE is_live=1 "
         "AND (last_seen IS NULL OR last_seen < %s)",

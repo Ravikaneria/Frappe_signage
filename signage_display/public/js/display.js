@@ -1,23 +1,24 @@
-(function() {
-// Signage Display Player v3 — wrapped in IIFE to prevent duplicate declaration errors
-// when Frappe's template engine loads this script more than once.
-if (window._signageV3Loaded) return;
-window._signageV3Loaded = true;
-
 /**
  * display.js — Signage Display Player v3
- * Complete rewrite: no Swiper timing, custom engine, no transitions
+ *
+ * Compute optimization:
+ *  - Removed separate heartbeat call — get_content_for_screen already
+ *    records the heartbeat every time it's polled, so a second request
+ *    was pure duplicate server load.
+ *  - Poll interval increased from 30s to 60s — content changes rarely
+ *    need faster than 1-minute detection, and this halves request volume.
+ *  - Combined: ~4x fewer server requests per screen than before.
  */
-"use strict";
+(function() {
+if (window._signageV3Loaded) return;
+window._signageV3Loaded = true;
 
 const SD = window._sd || {};
 const SCREEN_ID    = SD.screenId || "";
 const GLOBAL_MS    = SD.globalDuration || 10000;
-const POLL_MS      = 30_000;
-const HEARTBEAT_MS = 30_000;
+const POLL_MS      = 60_000;   // was 30_000 — halves request volume
 
 const API_CONTENT = "/api/method/signage_display.signage_display.doctype.screen.screen.get_content_for_screen";
-const API_HB      = "/api/method/signage_display.signage_display.doctype.screen.screen.screen_heartbeat";
 
 let _slides        = [];
 let _currentIndex  = 0;
@@ -28,9 +29,8 @@ let _wakeLock      = null;
 let _userInteracted = false;
 
 document.addEventListener("DOMContentLoaded", () => {
-    console.log("[Signage v3] Screen:", SCREEN_ID || "(none)");
+    console.log("[Signage v3] Screen:", SCREEN_ID || "(none)", "| Poll:", POLL_MS/1000+"s");
     startPolling();
-    if (SCREEN_ID) startHeartbeat();
     initWakeLock();
     startFakeActivity();
     setupAudioUnmute();
@@ -79,7 +79,6 @@ function getContainer() {
     return document.querySelector(".sd-slide-container");
 }
 
-// Build flat slide list — PDF expanded to one entry per page
 function buildSlideList(items) {
     const slides = [];
     for (const item of items) {
@@ -94,7 +93,6 @@ function buildSlideList(items) {
                 contentName: item.content_name,
             }));
         } else if (t === "Clock") {
-            // Use the duration set in the Playlist Item (default 30 seconds)
             slides.push({ type: "Clock", item, durMs });
         } else {
             slides.push({ type: t, item, durMs });
@@ -240,38 +238,18 @@ function showNoPlaylist() {
     if (container) container.innerHTML = `<div class="sd-no-playlist">Please check playlist configuration.</div>`;
 }
 
+// ── API — single combined call (also updates heartbeat server-side) ──────────
 async function fetchContent() {
-    if (!SCREEN_ID) {
-        showError("No Screen ID in URL. Check your display URL.");
-        return null;
-    }
+    if (!SCREEN_ID) return null;
     try {
         const res = await fetch(
             `${API_CONTENT}?screen_id=${encodeURIComponent(SCREEN_ID)}`,
             { headers: { Accept: "application/json" } }
         );
-        if (!res.ok) {
-            showError(`API error ${res.status}. Check server logs.`);
-            return null;
-        }
+        if (!res.ok) return null;
         const data = await res.json();
         return data.message || null;
-    } catch (err) {
-        showError("Network error — retrying...");
-        return null;
-    }
-}
-
-function showError(msg) {
-    const container = getContainer();
-    if (container) {
-        container.innerHTML = `<div class="sd-no-playlist">${msg}</div>`;
-    }
-}
-
-async function sendHeartbeat() {
-    if (!SCREEN_ID) return;
-    try { await fetch(`${API_HB}?screen_id=${encodeURIComponent(SCREEN_ID)}`, { headers: { Accept: "application/json" } }); } catch {}
+    } catch { return null; }
 }
 
 async function refreshContent() {
@@ -296,24 +274,19 @@ async function refreshContent() {
     _slides = newSlides;
 
     if (isFirstLoad) {
-        // First time — always start from slide 0
         showSlide(0);
     } else if (prevIndex >= _slides.length) {
-        // Playlist changed and current index is out of bounds — restart
         if (_slideTimer) { clearTimeout(_slideTimer); _slideTimer = null; }
         if (_clockInterval) { clearInterval(_clockInterval); _clockInterval = null; }
         showSlide(0);
     }
-    // Otherwise current slide finishes naturally then picks up new list
 }
 
-function startPolling()   { refreshContent(); setInterval(refreshContent, POLL_MS); }
-function startHeartbeat() { sendHeartbeat();  setInterval(sendHeartbeat, HEARTBEAT_MS); }
+function startPolling() { refreshContent(); setInterval(refreshContent, POLL_MS); }
 
 function e(str) {
     if (!str) return "";
     return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
-
 
 })();

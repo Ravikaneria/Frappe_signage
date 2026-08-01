@@ -11,10 +11,15 @@ website_route_rules = [
     {"from_route": "/content-manager", "to_route": "content-manager/index"},
 ]
 
+# Reduced from "all" (runs every ~4 min) to explicit cron every 5 minutes.
+# This is a lighter, predictable schedule that reduces background compute
+# while still catching offline screens promptly.
 scheduler_events = {
-    "all": [
-        "signage_display.signage_display.doctype.screen.screen.mark_screens_offline"
-    ]
+    "cron": {
+        "*/5 * * * *": [
+            "signage_display.signage_display.doctype.screen.screen.mark_screens_offline"
+        ]
+    }
 }
 
 after_install = "signage_display.install.install.after_install"

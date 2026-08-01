@@ -10,21 +10,23 @@
  "engine": "InnoDB",
  "field_order": [
   "naming_series",
-  "content_name",
-  "col_break_1",
-  "content_type",
-  "sec_media",
+  "sec_upload",
+  "upload_hint",
   "media_image",
   "video_file",
+  "pdf_file",
+  "col_break_1",
+  "content_type",
+  "content_name",
+  "sec_other",
   "youtube_url",
   "youtube_embed_url",
   "webpage_url",
   "redirect_url",
-  "pdf_file",
-  "pdf_pages_json",
   "clock_format",
   "clock_show_date",
   "clock_timezone_label",
+  "pdf_pages_json",
   "sec_notes",
   "notes"
  ],
@@ -39,13 +41,30 @@
    "hidden": 1
   },
   {
-   "fieldname": "content_name",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Content Name",
-   "reqd": 0,
-   "bold": 1,
-   "description": "Optional. Leave blank to auto-generate a name."
+   "fieldname": "sec_upload",
+   "fieldtype": "Section Break",
+   "label": "Upload"
+  },
+  {
+   "fieldname": "upload_hint",
+   "fieldtype": "HTML",
+   "options": "<p style='color:#888;font-size:13px;margin-bottom:8px;'>Attach ONE of the three below — Image, Video, or PDF. The type is detected automatically.<br>For YouTube / Webpage / Clock / URL, use the buttons at the top of this form instead.</p>"
+  },
+  {
+   "fieldname": "media_image",
+   "fieldtype": "Attach Image",
+   "label": "📷 Image"
+  },
+  {
+   "fieldname": "video_file",
+   "fieldtype": "Attach",
+   "label": "🎬 Video File (MP4 / WebM)"
+  },
+  {
+   "fieldname": "pdf_file",
+   "fieldtype": "Attach",
+   "label": "📄 PDF File",
+   "description": "Each page becomes one slide. Max 50 pages."
   },
   {
    "fieldname": "col_break_1",
@@ -58,36 +77,34 @@
    "in_list_view": 1,
    "label": "Content Type",
    "options": "Image\nVideo\nYouTube\nWebpage\nURL Redirect\nPDF\nClock",
-   "reqd": 1
+   "reqd": 1,
+   "read_only": 1,
+   "description": "Auto-detected from what you attach."
   },
   {
-   "fieldname": "sec_media",
+   "fieldname": "content_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Content Name",
+   "reqd": 0,
+   "bold": 1,
+   "description": "Auto-filled from filename. Edit if you like."
+  },
+  {
+   "fieldname": "sec_other",
    "fieldtype": "Section Break",
-   "label": "Media / Source"
-  },
-  {
-   "fieldname": "media_image",
-   "fieldtype": "Attach Image",
-   "label": "Image",
-   "depends_on": "eval:doc.content_type=='Image'"
-  },
-  {
-   "fieldname": "video_file",
-   "fieldtype": "Attach",
-   "label": "Video File (MP4 / WebM)",
-   "depends_on": "eval:doc.content_type=='Video'"
+   "label": "YouTube / Webpage / Clock / URL"
   },
   {
    "fieldname": "youtube_url",
    "fieldtype": "Data",
    "label": "YouTube URL",
-   "depends_on": "eval:doc.content_type=='YouTube'",
-   "description": "Paste any YouTube link: watch?v=, youtu.be/, or /shorts/"
+   "depends_on": "eval:doc.content_type=='YouTube'"
   },
   {
    "fieldname": "youtube_embed_url",
    "fieldtype": "Data",
-   "label": "YouTube Embed URL (auto-generated)",
+   "label": "YouTube Embed URL (auto)",
    "read_only": 1,
    "depends_on": "eval:doc.content_type=='YouTube'"
   },
@@ -102,21 +119,6 @@
    "fieldtype": "Data",
    "label": "URL",
    "depends_on": "eval:doc.content_type=='URL Redirect'"
-  },
-  {
-   "fieldname": "pdf_file",
-   "fieldtype": "Attach",
-   "label": "PDF File",
-   "depends_on": "eval:doc.content_type=='PDF'",
-   "description": "Each page becomes one slide. Max 50 pages."
-  },
-  {
-   "fieldname": "pdf_pages_json",
-   "fieldtype": "Long Text",
-   "label": "PDF Pages (internal)",
-   "hidden": 1,
-   "read_only": 1,
-   "no_copy": 1
   },
   {
    "default": "24 Hour",
@@ -140,9 +142,18 @@
    "depends_on": "eval:doc.content_type=='Clock'"
   },
   {
+   "fieldname": "pdf_pages_json",
+   "fieldtype": "Long Text",
+   "label": "PDF Pages (internal)",
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
    "fieldname": "sec_notes",
    "fieldtype": "Section Break",
-   "label": "Notes"
+   "label": "Notes",
+   "collapsible": 1
   },
   {
    "fieldname": "notes",

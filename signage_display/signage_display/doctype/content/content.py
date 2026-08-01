@@ -16,7 +16,6 @@ def _extract_yt_id(url):
 class Content(Document):
 
     def before_insert(self):
-        # Auto-generate content_name from filename if blank
         if not self.content_name:
             if self.media_image:
                 base = self.media_image.split("/")[-1].rsplit(".", 1)[0]
@@ -26,7 +25,6 @@ class Content(Document):
                 base = self.pdf_file.split("/")[-1].rsplit(".", 1)[0]
             else:
                 base = self.name or frappe.generate_hash(length=8)
-            # Clean up the name
             self.content_name = re.sub(r"[^a-zA-Z0-9 _-]", "", base)[:60].strip() or self.name
 
     def validate(self):
@@ -122,7 +120,6 @@ class Content(Document):
             frappe.throw(f"PDF processing failed: {exc}")
 
 
-# ── Shared fields used by API ─────────────────────────────────────────────────
 CONTENT_FIELDS = [
     "name", "content_name", "content_type",
     "media_image", "video_file",
@@ -152,24 +149,17 @@ def format_content(row, site_url, duration_sec=None):
     return item
 
 
-# ── Upload API for Content Manager gallery page ───────────────────────────────
 @frappe.whitelist()
 def create_content_from_upload(file_url, content_type, content_name=None):
-    """
-    Called by the Content Manager gallery page after a file is uploaded.
-    Creates a Content record with an auto-generated name.
-    """
     doc = frappe.new_doc("Content")
     doc.content_type = content_type
-    doc.content_name = content_name or ""  # will be auto-filled in before_insert
-
+    doc.content_name = content_name or ""
     if content_type == "Image":
         doc.media_image = file_url
     elif content_type == "Video":
         doc.video_file = file_url
     elif content_type == "PDF":
         doc.pdf_file = file_url
-
     doc.insert(ignore_permissions=True)
     frappe.db.commit()
     return {"name": doc.name, "content_name": doc.content_name}
