@@ -63,6 +63,7 @@ body{background:#f5f6fa;font-family:'Segoe UI',sans-serif;color:#222;}
 .cm-upload-bar.show{display:block;}
 .cm-prog-track{height:5px;background:#eee;border-radius:3px;margin-top:5px;overflow:hidden;}
 .cm-prog-fill{height:100%;background:#4CAF50;border-radius:3px;width:0%;transition:width 0.2s;}
+.cm-error-log{color:#c62828;font-size:11px;margin-top:4px;white-space:pre-wrap;max-height:80px;overflow-y:auto;}
 </style>
 {% endblock %}
 
@@ -83,6 +84,7 @@ body{background:#f5f6fa;font-family:'Segoe UI',sans-serif;color:#222;}
 <div id="uploadBar" class="cm-upload-bar">
     <span id="uploadStatus">Uploading...</span>
     <div class="cm-prog-track"><div class="cm-prog-fill" id="progFill"></div></div>
+    <div class="cm-error-log" id="errorLog"></div>
 </div>
 
 <div class="cm-stats">
@@ -119,7 +121,6 @@ const API  = "/api/method/";
 let allItems = [];
 let selected = new Set();
 
-// ── API helper ────────────────────────────────────────────────────────────────
 async function api(method, args) {
     const res = await fetch(API + method, {
         method: "POST",
@@ -135,37 +136,63 @@ async function api(method, args) {
     return data.message;
 }
 
-// ── Load content ──────────────────────────────────────────────────────────────
 async function load() {
     try {
-        const items = await api("frappe.client.get_list", {
-            doctype: "Content",
-            fields: ["name","content_name","content_type","media_image",
-                     "youtube_embed_url","video_file","webpage_url","redirect_url","modified"],
-            limit: 500,
-            order_by: "modified desc"
+        // Fetch raw response first so we can inspect exactly what came back
+        const res = await fetch(API + "frappe.client.get_list", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Frappe-CSRF-Token": CSRF,
+                "Accept": "application/json"
+            },
+            body: JSON.stringify({
+                doctype: "Content",
+                fields: ["name","content_name","content_type","media_image",
+                         "youtube_embed_url","video_file","webpage_url","redirect_url","modified"],
+                limit_page_length: 0,   // 0 = no limit, return ALL records
+                order_by: "modified desc"
+            })
         });
+
+        const rawText = await res.text();
+        let data;
+        try { data = JSON.parse(rawText); }
+        catch(parseErr) {
+            throw new Error(`Non-JSON response (HTTP ${res.status}): ${rawText.substring(0,300)}`);
+        }
+
+        if (data.exc || data.exception) {
+            throw new Error(data.exception || data.exc);
+        }
+
+        const items = data.message;
+        console.log("[Content Manager] Raw API response:", data);
+        console.log("[Content Manager] Items found:", items ? items.length : 0);
+
         allItems = items || [];
         render(allItems);
         document.getElementById("totalCount").textContent = allItems.length;
+
     } catch(e) {
         document.getElementById("gallery").innerHTML =
-            '<div class="cm-empty"><div class="cm-empty-icon">⚠️</div><p>Failed to load content.<br>Please refresh the page.</p></div>';
-        console.error("Load error:", e);
+            `<div class="cm-empty"><div class="cm-empty-icon">⚠️</div>
+             <p>Failed to load content.</p>
+             <p style="font-size:12px;color:#c62828;margin-top:10px;max-width:600px;word-wrap:break-word;">
+                ${e.message}
+             </p></div>`;
+        console.error("[Content Manager] Load error:", e);
     }
 }
 
-// ── Render ────────────────────────────────────────────────────────────────────
 function render(items) {
     const g = document.getElementById("gallery");
     if (!items.length) {
         g.innerHTML = `<div class="cm-empty"><div class="cm-empty-icon">🖼</div>
             <p>No content yet. Upload your first image!</p></div>` + dropzoneHTML();
-        bindDrop();
         return;
     }
     g.innerHTML = items.map(card).join("") + dropzoneHTML();
-    bindDrop();
 }
 
 function dropzoneHTML() {
@@ -176,8 +203,6 @@ function dropzoneHTML() {
         <p style="font-size:11px;margin-top:4px;">Images · Videos · PDFs — multiple files at once</p>
     </label>`;
 }
-
-function bindDrop() {}
 
 function ev(e, t) {
     e.preventDefault();
@@ -217,7 +242,6 @@ function card(item) {
     </div>`;
 }
 
-// ── Selection ─────────────────────────────────────────────────────────────────
 function toggle(id) {
     selected.has(id) ? selected.delete(id) : selected.add(id);
     updateSel();
@@ -242,7 +266,8 @@ document.getElementById("btnSelAll").onclick = () => {
     else { allItems.forEach(i => selected.add(i.name)); updateSel(); }
 };
 
-// ── Upload ────────────────────────────────────────────────────────────────────
+// ── Upload — FIXED: no folder param (was causing silent failure),
+// better error surfacing, checks every possible response shape ──────────────
 document.getElementById("fileInput").onchange = e => upload(e.target.files);
 
 async function upload(files) {
@@ -250,34 +275,50 @@ async function upload(files) {
     const bar = document.getElementById("uploadBar");
     const status = document.getElementById("uploadStatus");
     const fill = document.getElementById("progFill");
+    const errLog = document.getElementById("errorLog");
     bar.classList.add("show");
-    let done = 0;
+    errLog.textContent = "";
+    let done = 0, failed = 0;
 
     for (const file of files) {
         status.textContent = `Uploading ${done+1}/${files.length}: ${file.name}`;
         fill.style.width = `${Math.round(done/files.length*100)}%`;
         try {
-            // Step 1: Upload file — always public (is_private=0)
             const fd = new FormData();
             fd.append("file", file);
-            fd.append("is_private", "0");   // ← always public
-            fd.append("folder", "Home/Signage");
+            fd.append("is_private", "0");
+            // NOTE: removed "folder" param — Home/Signage may not exist,
+            // and Frappe's upload_file silently fails/returns incomplete
+            // response if the target folder is invalid. Default folder
+            // (Home) always exists.
 
             const up = await fetch("/api/method/upload_file", {
                 method: "POST",
                 headers: { "X-Frappe-CSRF-Token": CSRF },
                 body: fd
             });
-            const upData = await up.json();
-            const fileUrl = upData.message?.file_url;
-            if (!fileUrl) throw new Error("No file URL returned");
 
-            // Step 2: Determine type
+            const rawText = await up.text();
+            let upData;
+            try { upData = JSON.parse(rawText); }
+            catch(parseErr) {
+                throw new Error(`Server returned non-JSON (status ${up.status}): ${rawText.substring(0,200)}`);
+            }
+
+            if (upData.exception || upData.exc) {
+                throw new Error(upData.exception || "Server exception during upload");
+            }
+
+            // file_url can be in different places depending on Frappe version
+            const fileUrl = upData.message?.file_url || upData.file_url || upData.message?.name;
+            if (!fileUrl) {
+                throw new Error(`No file URL in response: ${JSON.stringify(upData).substring(0,200)}`);
+            }
+
             let ctype = "Image";
             if (file.type.startsWith("video/")) ctype = "Video";
             else if (file.type === "application/pdf") ctype = "PDF";
 
-            // Step 3: Create Content record
             await api("signage_display.signage_display.doctype.content.content.create_content_from_upload", {
                 file_url: fileUrl,
                 content_type: ctype,
@@ -285,20 +326,25 @@ async function upload(files) {
             });
 
         } catch(err) {
+            failed++;
             console.error("Upload failed:", file.name, err);
-            alert(`Upload failed: ${file.name}\n${err.message}`);
+            errLog.textContent += `❌ ${file.name}: ${err.message}\n`;
         }
         done++;
     }
 
     fill.style.width = "100%";
-    status.textContent = `Done! ${done} file(s) uploaded.`;
-    setTimeout(() => { bar.classList.remove("show"); fill.style.width="0%"; }, 2500);
+    status.textContent = failed
+        ? `Done: ${done - failed} succeeded, ${failed} failed. See errors below.`
+        : `Done! ${done} file(s) uploaded.`;
+
+    if (!failed) {
+        setTimeout(() => { bar.classList.remove("show"); fill.style.width="0%"; }, 2500);
+    }
     document.getElementById("fileInput").value = "";
     await load();
 }
 
-// ── Delete ────────────────────────────────────────────────────────────────────
 async function deleteSelected() {
     if (!selected.size) return;
     if (!confirm(`Delete ${selected.size} item(s)? This cannot be undone.`)) return;
@@ -311,11 +357,10 @@ async function deleteSelected() {
     updateSel();
 }
 
-// ── Add to Playlist ───────────────────────────────────────────────────────────
 async function openModal() {
     try {
         const pls = await api("frappe.client.get_list", {
-            doctype: "Playlist", fields: ["name","playlist_name"], limit: 100
+            doctype: "Playlist", fields: ["name","playlist_name"], limit_page_length: 0
         });
         const sel = document.getElementById("plSelect");
         sel.innerHTML = '<option value="">-- Select Playlist --</option>' +
@@ -336,7 +381,6 @@ async function confirmAdd() {
         doc.items = doc.items || [];
         const existing = new Set(doc.items.map(i => i.content));
         for (const id of selected) {
-            // Find content_name from allItems
             const item = allItems.find(i => i.name === id);
             const contentName = item?.content_name || id;
             if (!existing.has(contentName)) {
@@ -353,7 +397,6 @@ async function confirmAdd() {
     }
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────────
 load();
 </script>
 {% endblock %}
