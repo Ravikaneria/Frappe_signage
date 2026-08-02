@@ -249,14 +249,17 @@ function itemThumb(playlistName, item, idx) {
         thumb = `<div class="pl-item-icon">${TYPE_ICON[t]||"📁"}</div>`;
     }
     const bg = THUMB_BG[t] || "#1a1a2a";
+    // item.name = the child row's own docname — used for direct DB updates
+    // that avoid TimestampMismatchError on the parent Playlist doc
     return `<div class="pl-item">
         <div class="pl-item-thumb" style="background:${bg}">
             ${thumb}
-            <div class="pl-item-remove" onclick="removeItem('${playlistName}', ${idx})">✕</div>
+            <div class="pl-item-remove" onclick="removeItem('${item.name}')">✕</div>
         </div>
         <div class="pl-item-dur">
             <input type="number" value="${item.duration_sec||10}" min="1" max="3600"
-                   onchange="updateDuration('${playlistName}', ${idx}, this.value)" /> s
+                   data-item-name="${item.name}"
+                   onchange="updateDuration(this)" /> s
         </div>
     </div>`;
 }
@@ -330,39 +333,59 @@ function togglePicker(contentName) {
 
 async function confirmPicker() {
     if (!activePlaylistDoc) return;
-    const existing = new Map((activePlaylistDoc.items||[]).map(i => [i.content, i]));
-    const newItems = [];
-    pickerSelected.forEach(contentName => {
-        if (existing.has(contentName)) {
-            newItems.push(existing.get(contentName));
-        } else {
-            newItems.push({ doctype: "Playlist Item", content: contentName, duration_sec: 10, is_active: 1 });
-        }
-    });
-    activePlaylistDoc.items = newItems;
+    // Only need to ADD newly-selected items — existing ones stay untouched.
+    // Uses direct child-row inserts (add_items_to_playlist), never touching
+    // the parent Playlist's save/timestamp, so no conflict is possible.
+    const alreadyIn = new Set((activePlaylistDoc.items||[]).map(i => i.content));
+    const toAdd = [...pickerSelected].filter(c => !alreadyIn.has(c));
+
+    // Also handle deselection — items unchecked in the picker should be removed
+    const toRemove = (activePlaylistDoc.items||[]).filter(i => !pickerSelected.has(i.content));
+
     try {
-        await api("frappe.client.save", { doc: activePlaylistDoc });
+        if (toAdd.length) {
+            await api("signage_display.signage_display.doctype.playlist.playlist.add_items_to_playlist", {
+                playlist_name: activePlaylistDoc.name,
+                content_names: JSON.stringify(toAdd),
+                default_duration: 10
+            });
+        }
+        for (const item of toRemove) {
+            await api("signage_display.signage_display.doctype.playlist.playlist.remove_playlist_item", {
+                item_name: item.name
+            });
+        }
         closePicker();
         await loadAll();
     } catch(e) { alert("Failed: " + e.message); }
 }
 
-// ── Remove item / update duration inline ──────────────────────────────────
-async function removeItem(playlistName, idx) {
+// ── Remove item / update duration — DIRECT child-row updates ──────────────
+// These bypass the parent Playlist doc.save() entirely, so rapid edits or
+// overlapping requests can never cause a TimestampMismatchError.
+async function removeItem(itemName) {
     try {
-        const doc = await api("frappe.client.get", { doctype: "Playlist", name: playlistName });
-        doc.items.splice(idx, 1);
-        await api("frappe.client.save", { doc });
+        await api("signage_display.signage_display.doctype.playlist.playlist.remove_playlist_item", {
+            item_name: itemName
+        });
         await loadAll();
     } catch(e) { alert("Failed: " + e.message); }
 }
 
-async function updateDuration(playlistName, idx, value) {
-    try {
-        const doc = await api("frappe.client.get", { doctype: "Playlist", name: playlistName });
-        doc.items[idx].duration_sec = parseInt(value) || 10;
-        await api("frappe.client.save", { doc });
-    } catch(e) { alert("Failed: " + e.message); }
+// Debounce so rapid typing doesn't fire many overlapping requests
+let _durTimers = {};
+function updateDuration(inputEl) {
+    const itemName = inputEl.dataset.itemName;
+    const value = inputEl.value;
+    if (_durTimers[itemName]) clearTimeout(_durTimers[itemName]);
+    _durTimers[itemName] = setTimeout(async () => {
+        try {
+            await api("signage_display.signage_display.doctype.playlist.playlist.update_item_duration", {
+                item_name: itemName,
+                duration_sec: parseInt(value) || 10
+            });
+        } catch(e) { alert("Failed: " + e.message); }
+    }, 400);
 }
 
 // ── Assign to Screen ───────────────────────────────────────────────────────
