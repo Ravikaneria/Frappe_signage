@@ -62,12 +62,12 @@ body{background:#f5f6fa;font-family:'Segoe UI',sans-serif;color:#222;}
 /* ── Modals ── */
 .pl-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:300;display:none;align-items:center;justify-content:center;}
 .pl-modal-bg.open{display:flex;}
-.pl-modal{background:#fff;border-radius:12px;padding:24px;width:520px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;}
+.pl-modal{background:#fff;border-radius:12px;padding:24px;width:520px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;}
 .pl-modal h2{font-size:17px;margin-bottom:14px;}
 .pl-modal input[type=text]{width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;margin-bottom:14px;}
 .pl-modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;}
 
-.pl-picker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;overflow-y:auto;flex:1;padding:4px;}
+.pl-picker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;overflow-y:auto;flex:1;min-height:0;padding:4px;align-content:start;}
 .pl-picker-item{cursor:pointer;border:2px solid transparent;border-radius:8px;overflow:hidden;position:relative;}
 .pl-picker-item.picked{border-color:#4CAF50;}
 .pl-picker-thumb{width:100%;height:80px;background:#1a1a2a;display:flex;align-items:center;justify-content:center;}
@@ -77,6 +77,16 @@ body{background:#f5f6fa;font-family:'Segoe UI',sans-serif;color:#222;}
 
 .pl-screen-list{max-height:200px;overflow-y:auto;margin-bottom:12px;}
 .pl-screen-row{display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid #f5f5f5;font-size:13px;}
+/* ── Zoom Lightbox ── */
+.pl-lightbox-bg{position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:400;display:none;align-items:center;justify-content:center;cursor:zoom-out;}
+.pl-lightbox-bg.open{display:flex;}
+.pl-lightbox-img{max-width:90vw;max-height:85vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.5);}
+.pl-lightbox-caption{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);color:#fff;font-size:14px;background:rgba(0,0,0,0.5);padding:8px 18px;border-radius:20px;}
+.pl-lightbox-close{position:absolute;top:20px;right:28px;color:#fff;font-size:32px;cursor:pointer;line-height:1;}
+.pl-zoom-btn{position:absolute;bottom:3px;right:3px;width:20px;height:20px;background:rgba(0,0,0,0.55);color:#fff;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;cursor:zoom-in;z-index:3;}
+.pl-picker-thumb{position:relative;}
+.pl-item-thumb{position:relative;}
+
 </style>
 {% endblock %}
 
@@ -98,6 +108,13 @@ body{background:#f5f6fa;font-family:'Segoe UI',sans-serif;color:#222;}
 
 <div class="pl-grid" id="plGrid">
     <div class="pl-empty"><div class="pl-empty-icon">⏳</div><p>Loading playlists...</p></div>
+</div>
+
+<!-- Zoom Lightbox -->
+<div class="pl-lightbox-bg" id="lightboxBg" onclick="closeLightbox()">
+    <span class="pl-lightbox-close" onclick="closeLightbox()">&times;</span>
+    <img class="pl-lightbox-img" id="lightboxImg" src="" alt="" onclick="event.stopPropagation()" />
+    <div class="pl-lightbox-caption" id="lightboxCaption"></div>
 </div>
 
 <!-- New Playlist Modal -->
@@ -242,18 +259,22 @@ function playlistCard(doc) {
 function itemThumb(playlistName, item, idx) {
     const contentInfo = allContent.find(c => c.content_name === item.content || c.name === item.content);
     const t = contentInfo?.content_type || "Image";
+    const isImg = t === "Image" && contentInfo?.media_image;
     let thumb;
-    if (t === "Image" && contentInfo?.media_image) {
+    if (isImg) {
         thumb = `<img src="${contentInfo.media_image}" />`;
     } else {
         thumb = `<div class="pl-item-icon">${TYPE_ICON[t]||"📁"}</div>`;
     }
     const bg = THUMB_BG[t] || "#1a1a2a";
+    const zoomBtn = isImg
+        ? `<div class="pl-zoom-btn" onclick="event.stopPropagation(); openLightbox('${contentInfo.media_image.replace(/'/g,"\\'")}', '${(item.content||'').replace(/'/g,"\\'")}')">🔍</div>`
+        : "";
     // item.name = the child row's own docname — used for direct DB updates
     // that avoid TimestampMismatchError on the parent Playlist doc
     return `<div class="pl-item">
         <div class="pl-item-thumb" style="background:${bg}">
-            ${thumb}
+            ${thumb}${zoomBtn}
             <div class="pl-item-remove" onclick="removeItem('${item.name}')">✕</div>
         </div>
         <div class="pl-item-dur">
@@ -315,15 +336,29 @@ function renderPickerGrid() {
     g.innerHTML = allContent.map(c => {
         const picked = pickerSelected.has(c.content_name);
         const t = c.content_type || "Image";
-        let thumb = t === "Image" && c.media_image
+        const isImg = t === "Image" && c.media_image;
+        let thumb = isImg
             ? `<img src="${c.media_image}" />`
             : `<div style="font-size:22px;">${TYPE_ICON[t]||"📁"}</div>`;
         const bg = THUMB_BG[t] || "#1a1a2a";
+        const zoomBtn = isImg
+            ? `<div class="pl-zoom-btn" onclick="event.stopPropagation(); openLightbox('${c.media_image.replace(/'/g,"\\'")}', '${(c.content_name||'').replace(/'/g,"\\'")}')">🔍</div>`
+            : "";
         return `<div class="pl-picker-item${picked?" picked":""}" onclick="togglePicker('${c.content_name}')">
-            <div class="pl-picker-thumb" style="background:${bg}">${thumb}</div>
+            <div class="pl-picker-thumb" style="background:${bg}">${thumb}${zoomBtn}</div>
             <div class="pl-picker-check">✓</div>
         </div>`;
     }).join("");
+}
+
+function openLightbox(url, caption) {
+    document.getElementById("lightboxImg").src = url;
+    document.getElementById("lightboxCaption").textContent = caption || "";
+    document.getElementById("lightboxBg").classList.add("open");
+}
+function closeLightbox() {
+    document.getElementById("lightboxBg").classList.remove("open");
+    document.getElementById("lightboxImg").src = "";
 }
 
 function togglePicker(contentName) {
