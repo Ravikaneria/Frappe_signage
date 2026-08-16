@@ -74,6 +74,14 @@ body{background:#f5f6fa;font-family:'Segoe UI',sans-serif;color:#222;}
 /* Crop thumbnails square, like PosterBooking */
 .cm-thumb img{object-fit:cover;width:100%;height:100%;}
 
+/* ── Video Lightbox ── */
+.cm-video-bg{position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:400;display:none;align-items:center;justify-content:center;cursor:pointer;}
+.cm-video-bg.open{display:flex;}
+.cm-video-wrap{position:relative;max-width:90vw;max-height:85vh;width:900px;}
+.cm-video-wrap video{width:100%;max-height:82vh;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,0.6);display:block;background:#000;}
+.cm-video-caption{position:absolute;bottom:-36px;left:50%;transform:translateX(-50%);color:#fff;font-size:13px;background:rgba(0,0,0,0.5);padding:6px 16px;border-radius:20px;white-space:nowrap;}
+.cm-video-close{position:absolute;top:-40px;right:0;color:#fff;font-size:32px;cursor:pointer;line-height:1;}
+
 </style>
 {% endblock %}
 
@@ -117,6 +125,16 @@ body{background:#f5f6fa;font-family:'Segoe UI',sans-serif;color:#222;}
     <span class="cm-lightbox-close" onclick="closeLightbox()">&times;</span>
     <img class="cm-lightbox-img" id="lightboxImg" src="" alt="" onclick="event.stopPropagation()" />
     <div class="cm-lightbox-caption" id="lightboxCaption"></div>
+</div>
+
+<div class="cm-video-bg" id="videoBg" onclick="closeVideoLightbox()">
+    <div class="cm-video-wrap" onclick="event.stopPropagation()">
+        <span class="cm-video-close" onclick="closeVideoLightbox()">&times;</span>
+        <video id="videoPlayer" controls playsinline preload="metadata">
+            Your browser does not support the video tag.
+        </video>
+        <div class="cm-video-caption" id="videoCaption"></div>
+    </div>
 </div>
 
 <div class="cm-modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
@@ -255,6 +273,9 @@ function card(item) {
         thumb = `<img src="${item.media_image}" loading="lazy" />`;
         // Clicking the image itself zooms; clicking elsewhere on card selects
         zoomAttr = `onclick="event.stopPropagation(); openLightbox('${item.media_image.replace(/'/g,"\\'")}', '${displayName.replace(/'/g,"\\'")}')"`;
+    } else if (t === "Video" && item.video_file) {
+        thumb = `<div class="cm-thumb-icon">🎬</div>`;
+        zoomAttr = `onclick="event.stopPropagation(); openVideoLightbox('${(item.video_file||"").replace(/'/g,"\\'")}', '${displayName.replace(/'/g,"\\'")}')"`
     } else {
         const icons = {Video:"🎬",YouTube:"▶️",PDF:"📄",Clock:"🕐",Webpage:"🌐","URL Redirect":"🔗"};
         thumb = `<div class="cm-thumb-icon">${icons[t]||"📁"}</div>`;
@@ -279,6 +300,31 @@ function closeLightbox() {
     document.getElementById("lightboxBg").classList.remove("open");
     document.getElementById("lightboxImg").src = "";
 }
+
+function openVideoLightbox(url, caption) {
+    const player = document.getElementById("videoPlayer");
+    player.src = url;
+    player.load();
+    document.getElementById("videoCaption").textContent = caption;
+    document.getElementById("videoBg").classList.add("open");
+    // Auto-play once metadata loaded — browsers allow this since user clicked
+    player.onloadedmetadata = () => player.play().catch(() => {});
+}
+
+function closeVideoLightbox() {
+    const player = document.getElementById("videoPlayer");
+    player.pause();
+    player.src = "";
+    document.getElementById("videoBg").classList.remove("open");
+}
+
+// Close video lightbox with Escape key
+document.addEventListener("keydown", e => {
+    if (e.key === "Escape") {
+        closeLightbox();
+        closeVideoLightbox();
+    }
+});
 
 function toggle(id) {
     selected.has(id) ? selected.delete(id) : selected.add(id);
