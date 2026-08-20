@@ -9,6 +9,10 @@ frappe.listview_settings["Screen"] = {
     },
 
     onload: function(listview) {
+        listview.page.add_action_item(__("📱 Pair a Screen (QR)"), function() {
+            window.open("/pair", "_blank");
+        });
+
         listview.page.add_action_item(__("Generate Screens"), function() {
             const d = new frappe.ui.Dialog({
                 title: __("Generate Screens"),

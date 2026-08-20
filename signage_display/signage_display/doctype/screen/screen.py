@@ -141,6 +141,73 @@ def get_content_for_screen(screen_id):
     }
 
 
+
+
+@frappe.whitelist()
+def pair_screen_by_id(screen_id):
+    """
+    Called by /pair page when admin scans a QR code or types a Screen ID.
+
+    Two outcomes:
+      1. Screen ID already exists in Frappe → confirm it and return its details.
+      2. Screen ID is new (TV generated it itself, not yet in Frappe) → create
+         a new Screen record using that exact ID and return it.
+
+    The TV generates its own Screen ID on first boot and encodes it in the QR.
+    This function is the bridge: it makes Frappe aware of that screen.
+    """
+    screen_id = (screen_id or "").strip().upper()
+    if not screen_id or len(screen_id) != 5:
+        frappe.throw("Invalid Screen ID — must be exactly 5 characters.")
+
+    site_url  = frappe.utils.get_url()
+    existing  = frappe.db.get_value(
+        "Screen",
+        {"screen_id": screen_id},
+        ["name", "screen_name", "display_url", "is_active"],
+        as_dict=True,
+    )
+
+    if existing:
+        # Screen already registered — just return its info
+        return {
+            "created":      False,
+            "screen_id":    screen_id,
+            "screen_name":  existing.screen_name,
+            "display_url":  existing.display_url or f"{site_url}/display/{screen_id}",
+            "is_active":    existing.is_active,
+        }
+
+    # New screen — create it with the TV-supplied ID
+    doc = frappe.new_doc("Screen")
+    doc.screen_id   = screen_id           # override auto-generation
+    doc.screen_name = f"Screen {screen_id}"
+    doc.is_active   = 1
+    doc.insert(ignore_permissions=True)
+    frappe.db.commit()
+
+    return {
+        "created":      True,
+        "screen_id":    screen_id,
+        "screen_name":  doc.screen_name,
+        "display_url":  doc.display_url or f"{site_url}/display/{screen_id}",
+        "is_active":    1,
+    }
+
+
+@frappe.whitelist(allow_guest=True)
+def check_screen_paired(screen_id):
+    """
+    Called by the Android TV pairing screen every 5 seconds via polling.
+    Returns {"paired": true/false} so the TV knows when an admin has
+    scanned its QR code and registered it in Frappe.
+    Guest access is required — the TV is not logged in at this point.
+    """
+    screen_id = (screen_id or "").strip().upper()
+    exists = frappe.db.exists("Screen", {"screen_id": screen_id, "is_active": 1})
+    return {"paired": bool(exists), "screen_id": screen_id}
+
+
 def mark_screens_offline():
     """
     Scheduler: runs periodically. Marks screens offline after no heartbeat.

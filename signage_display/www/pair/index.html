@@ -1,0 +1,342 @@
+{% extends "templates/web.html" %}
+{% block title %}Pair Screen{% endblock %}
+
+{% block head_include %}
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0f1117; font-family: 'Segoe UI', sans-serif; color: #fff; min-height: 100vh; }
+.page_content, .container, .container-fluid { max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
+
+.pr-wrap {
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-start;
+    padding: 32px 16px 60px;
+}
+
+.pr-header {
+    text-align: center; margin-bottom: 28px;
+}
+.pr-header h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+.pr-header p  { color: #aaa; font-size: 14px; margin-top: 6px; }
+
+/* ── Scanner box ── */
+.pr-scanner-box {
+    width: 100%; max-width: 420px;
+    background: #1a1d27; border-radius: 16px;
+    overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    margin-bottom: 24px;
+}
+
+.pr-video-wrap {
+    position: relative; width: 100%; aspect-ratio: 1;
+    background: #000; overflow: hidden;
+}
+#preview {
+    width: 100%; height: 100%;
+    object-fit: cover; display: block;
+}
+.pr-crosshair {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+}
+.pr-crosshair svg { width: 220px; height: 220px; opacity: 0.9; }
+
+.pr-scanner-footer {
+    padding: 14px 20px;
+    display: flex; align-items: center; gap: 10px;
+}
+.pr-dot { width: 10px; height: 10px; border-radius: 50%; background: #f44; flex-shrink: 0; }
+.pr-dot.scanning { background: #4CAF50; animation: pulse 1.2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.pr-status { font-size: 13px; color: #aaa; }
+
+/* ── Manual input fallback ── */
+.pr-manual {
+    width: 100%; max-width: 420px;
+    background: #1a1d27; border-radius: 16px;
+    padding: 20px; margin-bottom: 24px;
+}
+.pr-manual h3 { font-size: 14px; color: #aaa; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+.pr-input-row { display: flex; gap: 8px; }
+.pr-input-row input {
+    flex: 1; background: #0f1117; border: 1.5px solid #333;
+    border-radius: 8px; padding: 10px 14px;
+    color: #fff; font-size: 18px; font-weight: 700;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    outline: none; text-align: center;
+}
+.pr-input-row input:focus { border-color: #4CAF50; }
+.pr-input-row input::placeholder { color: #555; font-size: 14px; letter-spacing: normal; font-weight: 400; }
+.pr-btn {
+    padding: 10px 18px; border-radius: 8px; border: none;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    background: #4CAF50; color: #fff;
+    transition: background 0.15s;
+}
+.pr-btn:hover { background: #388E3C; }
+.pr-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Result card ── */
+.pr-result {
+    width: 100%; max-width: 420px;
+    border-radius: 16px; padding: 24px;
+    text-align: center; display: none;
+    animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+.pr-result.success { background: #1b2e1b; border: 1.5px solid #4CAF50; }
+.pr-result.error   { background: #2e1b1b; border: 1.5px solid #f44336; }
+.pr-result-icon { font-size: 48px; margin-bottom: 12px; }
+.pr-result h2 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+.pr-result p  { font-size: 13px; color: #aaa; margin-bottom: 16px; }
+.pr-result .pr-screen-id {
+    font-size: 28px; font-weight: 700; letter-spacing: 0.2em;
+    color: #4CAF50; margin-bottom: 4px;
+}
+.pr-result-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
+.pr-btn-outline {
+    padding: 9px 16px; border-radius: 8px;
+    border: 1.5px solid #555; background: transparent;
+    color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.pr-btn-outline:hover { border-color: #fff; }
+</style>
+{% endblock %}
+
+{% block header %}{% endblock %}
+{% block navbar %}{% endblock %}
+
+{% block page_content %}
+<div class="pr-wrap">
+
+    <div class="pr-header">
+        <h1>📺 Pair a Screen</h1>
+        <p>Scan the QR code shown on the TV, or type the 5-digit Screen ID below.</p>
+    </div>
+
+    <!-- Camera Scanner -->
+    <div class="pr-scanner-box">
+        <div class="pr-video-wrap">
+            <video id="preview" muted playsinline></video>
+            <div class="pr-crosshair">
+                <svg viewBox="0 0 220 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Corner brackets -->
+                    <path d="M20 60 L20 20 L60 20"   stroke="#4CAF50" stroke-width="5" stroke-linecap="round"/>
+                    <path d="M160 20 L200 20 L200 60" stroke="#4CAF50" stroke-width="5" stroke-linecap="round"/>
+                    <path d="M200 160 L200 200 L160 200" stroke="#4CAF50" stroke-width="5" stroke-linecap="round"/>
+                    <path d="M60 200 L20 200 L20 160"    stroke="#4CAF50" stroke-width="5" stroke-linecap="round"/>
+                    <!-- Scan line (animated) -->
+                    <line id="scanLine" x1="30" y1="110" x2="190" y2="110" stroke="#4CAF50" stroke-width="2" opacity="0.7"/>
+                </svg>
+            </div>
+        </div>
+        <div class="pr-scanner-footer">
+            <div class="pr-dot" id="scanDot"></div>
+            <span class="pr-status" id="scanStatus">Starting camera…</span>
+        </div>
+    </div>
+
+    <!-- Manual ID Entry -->
+    <div class="pr-manual">
+        <h3>Or enter Screen ID manually</h3>
+        <div class="pr-input-row">
+            <input id="manualInput" type="text" maxlength="5" placeholder="e.g.  A3K7P"
+                   oninput="this.value=this.value.toUpperCase()" />
+            <button class="pr-btn" id="manualBtn" onclick="pairManual()">Pair</button>
+        </div>
+    </div>
+
+    <!-- Result -->
+    <div class="pr-result" id="resultCard">
+        <div class="pr-result-icon" id="resultIcon"></div>
+        <div class="pr-screen-id" id="resultScreenId"></div>
+        <h2 id="resultTitle"></h2>
+        <p id="resultMsg"></p>
+        <div class="pr-result-btns">
+            <button class="pr-btn" onclick="openScreen()">Open Display</button>
+            <button class="pr-btn-outline" onclick="resetScanner()">Pair Another</button>
+            <button class="pr-btn-outline" onclick="location.href='/app/screen'">View in ERPNext</button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+const CSRF     = "{{ csrf_token }}";
+const API_PAIR = "/api/method/signage_display.signage_display.doctype.screen.screen.pair_screen_by_id";
+
+let scanning   = true;
+let lastResult = null;
+let animFrame  = null;
+let scanY      = 30;
+let scanDir    = 1;
+
+// ── Animate scan line ─────────────────────────────────────────────────────────
+function animateScanLine() {
+    scanY += scanDir * 1.5;
+    if (scanY >= 190) scanDir = -1;
+    if (scanY <= 30)  scanDir =  1;
+    const line = document.getElementById("scanLine");
+    if (line) { line.setAttribute("y1", scanY); line.setAttribute("y2", scanY); }
+    animFrame = requestAnimationFrame(animateScanLine);
+}
+
+// ── Camera + QR scanning ──────────────────────────────────────────────────────
+async function startCamera() {
+    setStatus("Requesting camera…", false);
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 1280 } }
+        });
+        const video = document.getElementById("preview");
+        video.srcObject = stream;
+        await video.play();
+        setStatus("Scanning — point at the TV screen", true);
+        animateScanLine();
+        tickScan(video);
+    } catch (err) {
+        setStatus("Camera not available — use manual entry below", false);
+        console.warn("Camera error:", err);
+    }
+}
+
+function tickScan(video) {
+    if (!scanning) return;
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        const canvas = document.createElement("canvas");
+        canvas.width  = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(video, 0, 0);
+        try {
+            // BarcodeDetector API (Chrome/Edge on Android, desktop Chrome 88+)
+            if (window._barcodeDetector) {
+                window._barcodeDetector.detect(canvas).then(codes => {
+                    if (codes.length && scanning) {
+                        const raw = codes[0].rawValue;
+                        handleQRValue(raw);
+                    }
+                }).catch(() => {});
+            }
+        } catch(e) {}
+    }
+    setTimeout(() => tickScan(video), 250);
+}
+
+// ── Init BarcodeDetector ──────────────────────────────────────────────────────
+if ("BarcodeDetector" in window) {
+    window._barcodeDetector = new BarcodeDetector({ formats: ["qr_code"] });
+} else {
+    // Fallback: load ZXing-js for browsers without BarcodeDetector (Firefox, Safari)
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.1/umd/index.min.js";
+    s.onload = () => {
+        const hints = new Map();
+        // ZXing will scan continuously via its own reader — set up below
+        const codeReader = new ZXing.BrowserQRCodeReader();
+        codeReader.decodeFromVideoDevice(null, "preview", (result, err) => {
+            if (result && scanning) handleQRValue(result.getText());
+        });
+        setStatus("Scanning — point at the TV screen", true);
+        // Stop our own tickScan since ZXing handles it
+        scanning = false;
+        // Re-enable for our pair logic
+        scanning = true;
+    };
+    document.head.appendChild(s);
+}
+
+// ── Handle scanned / typed value ─────────────────────────────────────────────
+function handleQRValue(raw) {
+    if (!scanning) return;
+    // QR from the TV contains:  SIGNAGE:XXXXX  or just  XXXXX
+    let screenId = raw.trim().toUpperCase();
+    if (screenId.startsWith("SIGNAGE:")) screenId = screenId.replace("SIGNAGE:", "");
+    if (!/^[A-Z0-9]{5}$/.test(screenId)) return; // not a valid screen ID
+    scanning = false;
+    setStatus(`Found Screen ID: ${screenId}`, false);
+    pairScreen(screenId);
+}
+
+function pairManual() {
+    const id = document.getElementById("manualInput").value.trim().toUpperCase();
+    if (id.length !== 5) { alert("Please enter a 5-character Screen ID"); return; }
+    pairScreen(id);
+}
+
+// ── API call ──────────────────────────────────────────────────────────────────
+async function pairScreen(screenId) {
+    setStatus(`Pairing ${screenId}…`, true);
+    document.getElementById("manualBtn").disabled = true;
+
+    try {
+        const res = await fetch(API_PAIR, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Frappe-CSRF-Token": CSRF,
+                "Accept": "application/json"
+            },
+            body: JSON.stringify({ screen_id: screenId })
+        });
+        const data = await res.json();
+        if (data.exc || data.exception) throw new Error(data.exc || data.exception);
+        const msg = data.message;
+        lastResult = msg;
+        showResult(msg);
+    } catch (err) {
+        showError(screenId, err.message || "Unknown error");
+        resetScanner();
+    }
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+function setStatus(text, active) {
+    document.getElementById("scanStatus").textContent = text;
+    document.getElementById("scanDot").classList.toggle("scanning", active);
+}
+
+function showResult(msg) {
+    const card = document.getElementById("resultCard");
+    document.getElementById("resultIcon").textContent    = msg.created ? "🆕" : "✅";
+    document.getElementById("resultScreenId").textContent = msg.screen_id;
+    document.getElementById("resultTitle").textContent   = msg.created
+        ? "New screen created!" : "Screen linked!";
+    document.getElementById("resultMsg").textContent     = msg.created
+        ? `A new Screen record "${msg.screen_name}" was created in ERPNext and is ready to use.`
+        : `Screen "${msg.screen_name}" is already registered and has been confirmed.`;
+    card.className = "pr-result success";
+    card.style.display = "block";
+    setStatus("Paired successfully ✓", false);
+}
+
+function showError(screenId, msg) {
+    const card = document.getElementById("resultCard");
+    document.getElementById("resultIcon").textContent    = "❌";
+    document.getElementById("resultScreenId").textContent = screenId;
+    document.getElementById("resultTitle").textContent   = "Pairing failed";
+    document.getElementById("resultMsg").textContent     = msg;
+    card.className = "pr-result error";
+    card.style.display = "block";
+}
+
+function openScreen() {
+    if (lastResult?.display_url) window.open(lastResult.display_url, "_blank");
+}
+
+function resetScanner() {
+    scanning = true;
+    lastResult = null;
+    document.getElementById("resultCard").style.display = "none";
+    document.getElementById("manualInput").value = "";
+    document.getElementById("manualBtn").disabled = false;
+    setStatus("Scanning — point at the TV screen", true);
+}
+
+// Start
+startCamera();
+</script>
+{% endblock %}
